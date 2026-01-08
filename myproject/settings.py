@@ -60,6 +60,17 @@ MIDDLEWARE = [
 ]
 
 # Logging configuration for error tracking
+import os
+
+# Create logs directory if it doesn't exist (for development)
+logs_dir = os.path.join(BASE_DIR, 'logs')
+if not os.path.exists(logs_dir):
+    try:
+        os.makedirs(logs_dir)
+    except OSError:
+        # If we can't create logs directory (like on PythonAnywhere), skip file logging
+        pass
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -74,12 +85,6 @@ LOGGING = {
         },
     },
     'handlers': {
-        'file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django_errors.log'),
-            'formatter': 'verbose',
-        },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -97,12 +102,22 @@ LOGGING = {
             'propagate': False,
         },
         'myapp': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False,
         },
     },
 }
+
+# Add file handler only if logs directory exists and is writable
+if os.path.exists(logs_dir) and os.access(logs_dir, os.W_OK):
+    LOGGING['handlers']['file'] = {
+        'level': 'ERROR',
+        'class': 'logging.FileHandler',
+        'filename': os.path.join(logs_dir, 'django_errors.log'),
+        'formatter': 'verbose',
+    }
+    LOGGING['loggers']['myapp']['handlers'].append('file')
 
 ROOT_URLCONF = 'myproject.urls'
 
