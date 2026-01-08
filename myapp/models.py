@@ -7,18 +7,6 @@ from django.db.models import Sum, F
 from django.dispatch import receiver
 from django.db.models.signals import post_save, post_delete, pre_save
 from decimal import Decimal
-from django.contrib.auth.backends import ModelBackend
-
-# Custom Authentication Backend for Email Login
-class EmailBackend(ModelBackend):
-    def authenticate(self, request, username=None, password=None, **kwargs):
-        try:
-            user = User.objects.get(email=username)
-            if user.check_password(password):
-                return user
-        except User.DoesNotExist:
-            return None
-        return None
 
 # User Manager
 class CustomUserManager(BaseUserManager):
@@ -94,6 +82,18 @@ class User(AbstractUser):
 
     def __str__(self): return f"{self.username} ({self.get_role_display()})"
     class Meta: verbose_name = "User"; verbose_name_plural = "Users"
+
+# Custom Authentication Backend for Email Login
+from django.contrib.auth.backends import ModelBackend
+class EmailBackend(ModelBackend):
+    def authenticate(self, request, username=None, password=None, **kwargs):
+        try:
+            user = User.objects.get(email=username)
+            if user.check_password(password):
+                return user
+        except User.DoesNotExist:
+            return None
+        return None
 
 # -------------------------
 # Budget Model
