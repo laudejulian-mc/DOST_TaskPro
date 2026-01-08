@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-72-(ie&i&iwppsfsor=s*e0-a-28kvq6fd7g@vlni(-oaj9nho
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['taskpro.pythonanywhere.com', 'localhost', '127.0.0.1']
 
 #Inject for Custom Users
 AUTH_USER_MODEL = 'myapp.User'
