@@ -7,6 +7,18 @@ from django.db.models import Sum, F
 from django.dispatch import receiver
 from django.db.models.signals import post_save, post_delete, pre_save
 from decimal import Decimal
+from django.contrib.auth.backends import ModelBackend
+
+# Custom Authentication Backend for Email Login
+class EmailBackend(ModelBackend):
+    def authenticate(self, request, username=None, password=None, **kwargs):
+        try:
+            user = User.objects.get(email=username)
+            if user.check_password(password):
+                return user
+        except User.DoesNotExist:
+            return None
+        return None
 
 # User Manager
 class CustomUserManager(BaseUserManager):

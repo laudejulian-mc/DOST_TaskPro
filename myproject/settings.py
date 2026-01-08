@@ -30,6 +30,12 @@ ALLOWED_HOSTS = ['taskpro.pythonanywhere.com', 'localhost', '127.0.0.1']
 #Inject for Custom Users
 AUTH_USER_MODEL = 'myapp.User'
 
+# Custom Authentication Backend for Email Login
+AUTHENTICATION_BACKENDS = [
+    'myapp.models.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Application definition
 
 INSTALLED_APPS = [
