@@ -1,0 +1,88 @@
+{% extends "proponent/base.html" %}
+{% load static %}
+
+{% block title %}Extension Requests{% endblock %}
+{% block nav-extension-requests %}active-nav{% endblock %}
+{% block page-title %}Extension Requests{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<div class="container mt-2">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white
+                        {% if message.tags == 'success' %} bg-green-500
+                        {% elif message.tags == 'error' %} bg-red-500
+                        {% else %} bg-blue-500 {% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800">Extension Requests</h2>
+        <a href="{% url 'proponent_extension_requests_add_url' %}"
+           class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            <i class="fas fa-plus mr-2"></i>Add Extension Request
+        </a>
+    </div>
+
+    <!-- Extension Requests Table -->
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg p-4">
+        <table id="proponentExtensionRequestsTable" class="min-w-full text-sm text-left text-gray-600">
+            <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Proposal/Project</th>
+                    <th class="px-4 py-2">Reason</th>
+                    <th class="px-4 py-2">Requested Days</th>
+                    <th class="px-4 py-2">Date Requested</th>
+                    <th class="px-4 py-2">Status</th>
+                    <th class="px-4 py-2">Attachment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for request in extension_requests %}
+                <tr>
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2">{{ request.proposal.title }}{% if request.proposal.project %} (Project: {{ request.proposal.project.title }}){% endif %}</td>
+                    <td class="px-4 py-2">{{ request.reason|truncatechars:50 }}</td>
+                    <td class="px-4 py-2">{{ request.requested_extension_days }}</td>
+                    <td class="px-4 py-2">{{ request.date_submitted|date:"M d, Y" }}</td>
+                    <td class="px-4 py-2">{{ request.status|title }}</td>
+                    <td class="px-4 py-2">{% if request.letter %}Yes{% else %}No{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        No extension requests found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Only initialize DataTables if there are data rows
+    var rowCount = $('#proponentExtensionRequestsTable tbody tr').length;
+    if (rowCount > 1 || (rowCount === 1 && !$('#proponentExtensionRequestsTable tbody tr td[colspan]').length)) {
+        $('#proponentExtensionRequestsTable').DataTable({
+            "pageLength": 25,
+            "order": [[ 4, "desc" ]], // Sort by date requested descending
+            "columnDefs": [
+                { "orderable": false, "targets": [6] } // Don't sort attachment column
+            ]
+        });
+    }
+});
+</script>
+
+{% endblock %}

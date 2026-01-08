@@ -1,0 +1,145 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Manage Members - {{ chat.name }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Manage Members</h1>
+                        <p class="mt-1 text-sm text-gray-500">{{ chat.name }}</p>
+                    </div>
+                    <a href="{% url 'administrator_group_chat_detail_url' chat_id=chat.id %}"
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200">
+                        <span class="material-icons text-sm mr-2">arrow_back</span>
+                        Back to Chat
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Current Members -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Current Members ({{ current_members|length }})</h2>
+                <div class="space-y-3">
+                    {% for member in current_members %}
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                                <span class="text-xs font-medium text-gray-600">
+                                    {{ member.user.first_name|first|upper }}{{ member.user.last_name|first|upper }}
+                                </span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">{{ member.user.get_full_name }}</p>
+                                <p class="text-xs text-gray-500">{{ member.user.email }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            {% if member.role == 'admin' %}
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                Admin
+                            </span>
+                            {% else %}
+                            <form method="post" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="change_role">
+                                <input type="hidden" name="member_id" value="{{ member.id }}">
+                                <select name="role" onchange="this.form.submit()" class="text-xs border border-gray-300 rounded px-2 py-1">
+                                    <option value="member" {% if member.role == 'member' %}selected{% endif %}>Member</option>
+                                    <option value="admin" {% if member.role == 'admin' %}selected{% endif %}>Admin</option>
+                                </select>
+                            </form>
+                            {% endif %}
+
+                            {% if member.user != user %}
+                            <form method="post" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_member">
+                                <input type="hidden" name="member_id" value="{{ member.id }}">
+                                <button type="submit" onclick="return confirm('Are you sure you want to remove this member?')"
+                                        class="text-red-600 hover:text-red-800 p-1">
+                                    <span class="material-icons text-sm">person_remove</span>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-gray-500 text-sm">No members found.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Add New Members -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Add New Members</h2>
+                {% if available_users %}
+                <form method="post" id="addMemberForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_member">
+
+                    <div class="space-y-4">
+                        <div>
+                            <label for="user_id" class="block text-sm font-medium text-gray-700">Select User</label>
+                            <select name="user_id" id="user_id" required
+                                    class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">Choose a user...</option>
+                                {% for user in available_users %}
+                                <option value="{{ user.id }}">{{ user.get_full_name }} ({{ user.email }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
+                            <select name="role" id="role"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="member">Member</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+
+                        <button type="submit"
+                                class="w-full inline-flex justify-center items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200">
+                            <span class="material-icons text-sm mr-2">person_add</span>
+                            Add Member
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <p class="text-gray-500 text-sm">All active users are already members of this chat.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('addMemberForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const userSelect = document.getElementById('user_id');
+            console.log('Form submitted, user_id value:', userSelect.value);
+            if (!userSelect.value || userSelect.value === '') {
+                e.preventDefault();
+                alert('Please select a user to add to the group chat.');
+                userSelect.focus();
+                return false;
+            }
+        });
+    } else {
+        console.error('Form with id "addMemberForm" not found');
+    }
+});
+</script>

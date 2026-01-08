@@ -1,0 +1,79 @@
+{% extends 'beneficiary/base.html' %}
+{% load static %}
+
+{% block title %}Messages - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Messages</h1>
+                        <p class="mt-1 text-sm text-gray-500">Chat with other users</p>
+                    </div>
+                    <a href="{% url 'beneficiary_compose_message_url' %}"
+                       class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200">
+                        <span class="material-icons text-sm mr-2">send</span>
+                        Compose Message
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white rounded-lg shadow-sm border">
+            <!-- Conversations List -->
+            <div class="divide-y divide-gray-200">
+                {% for conversation in conversations %}
+                <a href="{% url 'beneficiary_conversation_url' partner_id=conversation.partner.id %}"
+                   class="block hover:bg-gray-50 transition duration-200">
+                    <div class="px-6 py-4">
+                        <div class="flex items-start space-x-3">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                                    <span class="text-gray-600 font-medium">
+                                        {{ conversation.partner.first_name|first|upper }}{{ conversation.partner.last_name|first|upper }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm font-medium text-gray-900">
+                                        {{ conversation.partner.get_full_name }}
+                                    </p>
+                                    <div class="flex items-center space-x-2">
+                                        {% if conversation.latest_message.attachment %}
+                                        <span class="material-icons text-gray-400 text-sm" title="Has attachment">attach_file</span>
+                                        {% endif %}
+                                        <p class="text-sm text-gray-500">{{ conversation.last_activity|date:"M d, Y H:i" }}</p>
+                                    </div>
+                                </div>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ conversation.latest_message.subject }}</p>
+                                <p class="text-sm text-gray-600 mt-1">{{ conversation.latest_message.content|truncatechars:150 }}</p>
+                            </div>
+                            {% if conversation.unread_count > 0 %}
+                            <div class="flex-shrink-0">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {{ conversation.unread_count }} New
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="px-6 py-12 text-center">
+                    <span class="material-icons text-gray-400 text-4xl mb-4">chat</span>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No conversations yet</h3>
+                    <p class="text-gray-500">Start a conversation by composing a new message.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

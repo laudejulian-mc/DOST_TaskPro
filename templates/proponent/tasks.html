@@ -1,0 +1,242 @@
+{% extends "proponent/base.html" %}
+{% load static %}
+
+{% block title %}My Assignments{% endblock %}
+{% block nav-tasks %}active-nav{% endblock %}
+{% block page-title %}My Assignments{% endblock %}
+
+{% block content %}
+<!-- Alpine.js -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+<!-- jQuery, DataTables -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<!-- LeafletJS for Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Material Icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<div class="container mt-2" x-data="taskManager()">
+
+    <!-- Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white {% if message.tags == 'success' %}bg-green-500{% elif message.tags == 'error' %}bg-red-500{% else %}bg-blue-500{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800">Projects Assigned to You</h2>
+                <p class="text-gray-600 text-sm">Below are the projects you are assigned to manage.</p>
+            </div>
+        </div>
+    </div>
+
+    {% if tasks %}
+    <!-- Assignments Table -->
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg p-4">
+        <table id="tasksTable" class="min-w-full text-sm text-left text-gray-600">
+            <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Project</th>
+                    <th class="px-4 py-2">Task Description</th>
+                    <th class="px-4 py-2">Due Date</th>
+                    <th class="px-4 py-2">Status</th>
+                    <th class="px-4 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2 font-medium">{{ task.project.project_title|truncatewords:5 }}</td>
+                    <td class="px-4 py-2">{{ task.description|truncatewords:10 }}</td>
+                    <td class="px-4 py-2">
+                        {% if task.due_date %}
+                            {{ task.due_date|date:"M d, Y" }}
+                        {% else %}
+                            <span class="text-gray-400">No due date</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        {% if task.status == 'pending' %}
+                            <span class="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 font-medium">Pending</span>
+                        {% elif task.status == 'in_progress' %}
+                            <span class="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">In Progress</span>
+                        {% elif task.status == 'completed' %}
+                            <span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">Completed</span>
+                        {% elif task.status == 'delayed' %}
+                            <span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">Delayed</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        <div class="flex gap-2 justify-center">
+                            {% if task.project.latitude and task.project.longitude %}
+                            <button type="button"
+                                    class="px-3 py-1 text-xs text-white bg-green-500 rounded hover:bg-green-600"
+                                    @click="openViewMapModal('{{ task.title|escapejs }}', {{ task.project.latitude }}, {{ task.project.longitude }})">
+                                <span class="material-icons text-sm align-middle">location_on</span> View Map
+                            </button>
+                            {% else %}
+                            <span class="text-gray-400 text-xs">No location</span>
+                            {% endif %}
+
+                            <button type="button"
+                                    @click="editTask = {id: {{ task.id }}, title: '{{ task.title|escapejs }}', description: '{{ task.description|escapejs }}', status: '{{ task.status }}', due_date: '{{ task.due_date|date:'Y-m-d' }}'}; openEdit = true"
+                                    class="px-3 py-1 text-xs text-white bg-blue-500 rounded hover:bg-blue-600">
+                                <span class="material-icons text-sm align-middle">edit</span> Edit Status
+                            </button>
+
+                            {% if task.status != 'completed' %}
+                            <form method="POST" action="{% url 'mark_task_completed' task.id %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="px-3 py-1 text-xs text-white bg-green-500 rounded hover:bg-green-600"
+                                        onclick="return confirm('Mark this task as completed?')">
+                                    <span class="material-icons text-sm align-middle">check_circle</span> Complete
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <!-- No Tasks Message -->
+    <div class="bg-white rounded-xl shadow-lg p-12 text-center">
+        <span class="material-icons text-6xl text-gray-300 mb-4">assignment_turned_in</span>
+        <h3 class="text-xl font-semibold text-gray-700 mb-2">No tasks assigned to you yet</h3>
+        <p class="text-gray-500">When the administrator assigns tasks to you, they will appear here.</p>
+    </div>
+    {% endif %}
+
+    <!-- View Map Modal -->
+    <div x-show="openViewMap" x-transition x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div @click.away="openViewMap = false" class="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold" x-text="'Task Location: ' + viewMapTitle"></h3>
+                <button @click="openViewMap = false" class="text-gray-500 hover:text-gray-700">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div id="viewMap" class="w-full h-80 rounded-lg border"></div>
+            <div class="flex justify-end mt-4">
+                <button type="button" @click="openViewMap = false" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Task Status Modal -->
+    <div x-show="openEdit" x-transition x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div @click.away="openEdit = false" class="bg-white w-full max-w-md p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Update Task Status</h3>
+                <button @click="openEdit = false" class="text-gray-500 hover:text-gray-700">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <h4 class="font-medium text-gray-800" x-text="editTask.title"></h4>
+                <p class="text-sm text-gray-600 mt-1" x-text="editTask.description"></p>
+            </div>
+
+            <form method="POST" action="{% url 'proponent_task_edit_url' %}">
+                {% csrf_token %}
+                <input type="hidden" name="id" :value="editTask.id">
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select name="status" x-model="editTask.status" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="delayed">Delayed</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="openEdit = false" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function taskManager() {
+    return {
+        openViewMap: false,
+        openEdit: false,
+        viewMapTitle: '',
+        viewMapLat: 0,
+        viewMapLng: 0,
+        viewMapInstance: null,
+        editTask: {},
+        
+        openViewMapModal(title, lat, lng) {
+            this.viewMapTitle = title;
+            this.viewMapLat = lat;
+            this.viewMapLng = lng;
+            this.openViewMap = true;
+            
+            this.$nextTick(() => {
+                this.initViewMap(lat, lng);
+            });
+        },
+        
+        initViewMap(lat, lng) {
+            // Remove existing map instance if any
+            if (this.viewMapInstance) {
+                this.viewMapInstance.remove();
+                this.viewMapInstance = null;
+            }
+            
+            // Initialize new map
+            this.viewMapInstance = L.map('viewMap').setView([lat || 11.5833, lng || 124.4667], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(this.viewMapInstance);
+            
+            // Add marker
+            L.marker([lat, lng]).addTo(this.viewMapInstance)
+                .bindPopup(this.viewMapTitle)
+                .openPopup();
+            
+            // Invalidate size after a short delay
+            setTimeout(() => {
+                this.viewMapInstance.invalidateSize();
+            }, 200);
+        }
+    }
+}
+
+$(document).ready(function() {
+    $('#tasksTable').DataTable({
+        order: [[4, 'asc']], // Sort by due date
+        pageLength: 10
+    });
+});
+</script>
+
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+{% endblock %}

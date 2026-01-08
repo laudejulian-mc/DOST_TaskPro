@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chart Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Chart Test</h1>
+    <canvas id="testChart" width="400" height="400"></canvas>
+    
+    <script>
+        console.log('Script loaded');
+        
+        // Test data
+        const testData = {"pending": 5, "approved": 10, "rejected": 2};
+        console.log('Test data:', testData);
+        
+        const ctx = document.getElementById('testChart').getContext('2d');
+        console.log('Canvas context:', ctx);
+        
+        try {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'Approved', 'Rejected'],
+                    datasets: [{
+                        data: [testData.pending, testData.approved, testData.rejected],
+                        backgroundColor: ['yellow', 'green', 'red']
+                    }]
+                }
+            });
+            console.log('Chart created successfully');
+        } catch (error) {
+            console.error('Chart creation error:', error);
+        }
+    </script>
+</body>
+</html>

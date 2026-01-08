@@ -1,0 +1,299 @@
+{% extends "administrator/base.html" %}
+{% load static %}
+
+{% block title %}Forms Management{% endblock %}
+{% block nav-forms %}active-nav{% endblock %}
+{% block page-title %}Forms Management{% endblock %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<div class="container mt-2" x-data="{ 
+    openAdd: false, 
+    openEdit: false, 
+    openDelete: false, 
+    editForm: {}, 
+    deleteForm: {}
+}">
+
+    <!-- ✅ Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white 
+                        {% if message.tags == 'success' %} bg-green-500 
+                        {% elif message.tags == 'error' %} bg-red-500 
+                        {% else %} bg-blue-500 {% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- ✅ Action Bar -->
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <p class="text-gray-600 dark:text-gray-300">Upload and manage downloadable form templates for all users.</p>
+        </div>
+        <button @click="openAdd = true"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg shadow">
+            + Upload Form
+        </button>
+    </div>
+
+    <!-- ✅ Forms Table -->
+    <div class="overflow-x-auto bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
+        <table id="formsTable" class="min-w-full text-sm text-left text-gray-600 dark:text-gray-300">
+            <thead class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                <tr>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Title</th>
+                    <th class="px-4 py-2">Category</th>
+                    <th class="px-4 py-2">File Type</th>
+                    <th class="px-4 py-2">Uploaded By</th>
+                    <th class="px-4 py-2">Upload Date</th>
+                    <th class="px-4 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for form in forms %}
+                <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2 font-medium">{{ form.title }}</td>
+                    <td class="px-4 py-2">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium
+                            {% if form.category == 'proposal' %}bg-purple-200 text-purple-700
+                            {% elif form.category == 'project' %}bg-blue-200 text-blue-700
+                            {% elif form.category == 'financial' %}bg-green-200 text-green-700
+                            {% elif form.category == 'report' %}bg-yellow-200 text-yellow-700
+                            {% elif form.category == 'compliance' %}bg-orange-200 text-orange-700
+                            {% else %}bg-gray-200 text-gray-700{% endif %}">
+                            {{ form.get_category_display }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2">
+                        {% with ext=form.file.name|slice:"-4:" %}
+                            {% if '.pdf' in ext %}
+                                <span class="text-red-600">📄 PDF</span>
+                            {% elif '.doc' in ext %}
+                                <span class="text-blue-600">📝 DOC</span>
+                            {% elif '.xls' in ext %}
+                                <span class="text-green-600">📊 Excel</span>
+                            {% else %}
+                                <span class="text-gray-600">📁 File</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="px-4 py-2">{{ form.uploaded_by.full_name|default:"Unknown" }}</td>
+                    <td class="px-4 py-2">{{ form.date_uploaded|date:"M d, Y" }}</td>
+                    <td class="px-4 py-2 text-center">
+                        <div class="flex justify-center gap-2">
+                            <!-- Preview Button -->
+                            <button type="button"
+                                onclick="previewDocument('{{ form.file.url }}', '{{ form.title }}')"
+                                class="px-3 py-1 text-white bg-blue-500 rounded hover:bg-blue-600 text-xs"
+                                title="Preview">
+                                👁 Preview
+                            </button>
+                            <!-- Download Button -->
+                            <a href="{% url 'form_download_url' form.id %}"
+                                class="px-3 py-1 text-white bg-green-500 rounded hover:bg-green-600 text-xs"
+                                title="Download">
+                                ⬇ Download
+                            </a>
+                            <!-- Edit Button -->
+                            <button type="button"
+                                class="px-3 py-1 text-white bg-yellow-500 rounded hover:bg-yellow-600 text-xs editBtn"
+                                data-id="{{ form.id }}"
+                                data-title="{{ form.title }}"
+                                data-description="{{ form.description|default:'' }}"
+                                data-category="{{ form.category }}"
+                                data-filename="{{ form.file.name }}"
+                                @click="editForm = {
+                                    id: $el.dataset.id,
+                                    title: $el.dataset.title,
+                                    description: $el.dataset.description,
+                                    category: $el.dataset.category,
+                                    filename: $el.dataset.filename
+                                }; openEdit = true">
+                                ✏ Edit
+                            </button>
+                            <!-- Delete Button -->
+                            <button type="button"
+                                class="px-3 py-1 text-white bg-red-500 rounded hover:bg-red-600 text-xs deleteBtn"
+                                data-id="{{ form.id }}"
+                                data-title="{{ form.title }}"
+                                @click="deleteForm = {
+                                    id: $el.dataset.id,
+                                    title: $el.dataset.title
+                                }; openDelete = true">
+                                🗑 Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        No forms uploaded yet. Click "Upload Form" to add your first form template.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ✅ Add Form Modal -->
+    <div x-show="openAdd" x-cloak
+        class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+        @keydown.escape.window="openAdd = false">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-lg mx-4" @click.outside="openAdd = false">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Upload New Form</h2>
+            <form method="POST" action="{% url 'administrator_forms_add_url' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
+                    <input type="text" name="title" required
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter form title">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                    <textarea name="description" rows="3"
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                        placeholder="Optional description"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                    <select name="category"
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                        {% for value, label in categories %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">File (PDF, DOC, DOCX, XLS, XLSX) *</label>
+                    <input type="file" name="file" required accept=".pdf,.doc,.docx,.xls,.xlsx"
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="openAdd = false"
+                        class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-white rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Upload Form
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ✅ Edit Form Modal -->
+    <div x-show="openEdit" x-cloak
+        class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+        @keydown.escape.window="openEdit = false">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-lg mx-4" @click.outside="openEdit = false">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Edit Form</h2>
+            <form method="POST" :action="'{% url 'administrator_forms_edit_url' 0 %}'.replace('/0/', '/' + editForm.id + '/')" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
+                    <input type="text" name="title" required x-model="editForm.title"
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                    <textarea name="description" rows="3" x-model="editForm.description"
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                    <select name="category" x-model="editForm.category"
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                        {% for value, label in categories %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current File</label>
+                    <p class="text-sm text-gray-500 dark:text-gray-400" x-text="editForm.filename"></p>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Replace File (optional)</label>
+                    <input type="file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx"
+                        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="openEdit = false"
+                        class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-white rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">
+                        Update Form
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ✅ Delete Confirmation Modal -->
+    <div x-show="openDelete" x-cloak
+        class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+        @keydown.escape.window="openDelete = false">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md mx-4" @click.outside="openDelete = false">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Confirm Delete</h2>
+            <p class="text-gray-600 dark:text-gray-300 mb-6">
+                Are you sure you want to delete the form "<span class="font-medium" x-text="deleteForm.title"></span>"? This action cannot be undone.
+            </p>
+            <form method="POST" :action="'{% url 'administrator_forms_delete_url' 0 %}'.replace('/0/', '/' + deleteForm.id + '/')">
+                {% csrf_token %}
+                <div class="flex justify-end gap-3">
+                    <button type="button" @click="openDelete = false"
+                        class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-white rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+
+<script>
+$(document).ready(function() {
+    // Only initialize DataTables if there are data rows
+    if ($('#formsTable tbody tr').length > 0 && !$('#formsTable tbody tr td[colspan]').length) {
+        $('#formsTable').DataTable({
+            "pageLength": 10,
+            "order": [[5, "desc"]],
+            "columnDefs": [
+                { "orderable": false, "targets": 6 }
+            ]
+        });
+    }
+});
+</script>
+{% endblock %}

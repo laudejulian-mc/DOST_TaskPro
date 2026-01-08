@@ -1,0 +1,173 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Announcements - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Announcements</h1>
+                    <p class="mt-1 text-sm text-gray-500">Manage system-wide announcements</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <a href="{% url 'administrator_communication_hub_url' %}"
+                       class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition duration-200">
+                        <span class="material-icons text-sm mr-2">arrow_back</span>
+                        Back to Hub
+                    </a>
+                    <a href="{% url 'administrator_create_announcement_url' %}"
+                       class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200">
+                        <span class="material-icons text-sm mr-2">campaign</span>
+                        Create Announcement
+                    </a>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Flash Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 p-3 rounded-lg text-white 
+                            {% if message.tags == 'success' %} bg-green-500 
+                            {% elif message.tags == 'error' %} bg-red-500 
+                            {% else %} bg-blue-500 {% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        {% if announcements %}
+        <div class="space-y-6">
+            {% for announcement in announcements %}
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <h2 class="text-xl font-semibold text-gray-900">{{ announcement.title }}</h2>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if announcement.priority == 'urgent' %}bg-red-100 text-red-800
+                                {% elif announcement.priority == 'high' %}bg-orange-100 text-orange-800
+                                {% elif announcement.priority == 'normal' %}bg-blue-100 text-blue-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ announcement.get_priority_display }}
+                            </span>
+                            {% if not announcement.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                Inactive
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="prose prose-sm max-w-none text-gray-700 mb-4">
+                            {{ announcement.content|linebreaks }}
+                        </div>
+
+                        <div class="flex items-center space-x-6 text-sm text-gray-500">
+                            <span>By {{ announcement.created_by.get_full_name }}</span>
+                            <span>Created {{ announcement.created_at|date:"M d, Y H:i" }}</span>
+                            {% if announcement.expires_at %}
+                            <span>Expires {{ announcement.expires_at|date:"M d, Y H:i" }}</span>
+                            {% endif %}
+                        </div>
+
+                        {% if announcement.target_roles %}
+                        <div class="mt-3">
+                            <span class="text-sm text-gray-600">Targeted to: </span>
+                            {% for role in announcement.target_roles %}
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mr-1">
+                                {{ role|title }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="ml-6 flex-shrink-0">
+                        <div class="flex space-x-2">
+                            <a href="{% url 'administrator_update_announcement_url' announcement.id %}" 
+                               class="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
+                               title="Edit Announcement">
+                                <span class="material-icons text-sm">edit</span>
+                            </a>
+                            <button type="button" 
+                                    onclick="confirmDeleteAnnouncement({{ announcement.id }}, '{{ announcement.title|escapejs }}')"
+                                    class="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
+                                    title="Delete Announcement">
+                                <span class="material-icons text-sm">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white rounded-lg shadow-sm border p-12 text-center">
+            <span class="material-icons text-gray-400 text-6xl mb-4">campaign</span>
+            <h3 class="text-xl font-medium text-gray-900 mb-2">No Announcements Yet</h3>
+            <p class="text-gray-500 mb-6">Create your first announcement to communicate with the team.</p>
+            <a href="{% url 'administrator_create_announcement_url' %}"
+               class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200">
+                <span class="material-icons text-sm mr-2">campaign</span>
+                Create Announcement
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteAnnouncementModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div class="flex items-center mb-4">
+            <span class="material-icons text-red-600 text-3xl mr-3">warning</span>
+            <h3 class="text-lg font-semibold text-gray-900">Delete Announcement</h3>
+        </div>
+        <p class="text-gray-600 mb-2">Are you sure you want to delete this announcement?</p>
+        <p class="text-gray-800 font-medium mb-6" id="deleteAnnouncementTitle"></p>
+        <div class="flex justify-end space-x-3">
+            <button onclick="closeDeleteModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                Cancel
+            </button>
+            <a id="deleteAnnouncementLink" href="#" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                Delete
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDeleteAnnouncement(id, title) {
+    document.getElementById('deleteAnnouncementTitle').textContent = title;
+    document.getElementById('deleteAnnouncementLink').href = "{% url 'administrator_delete_announcement_url' 0 %}".replace('/0/', '/' + id + '/');
+    document.getElementById('deleteAnnouncementModal').classList.remove('hidden');
+    document.getElementById('deleteAnnouncementModal').classList.add('flex');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteAnnouncementModal').classList.add('hidden');
+    document.getElementById('deleteAnnouncementModal').classList.remove('flex');
+}
+
+// Close on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeDeleteModal();
+    }
+});
+
+// Close on backdrop click
+document.getElementById('deleteAnnouncementModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
+    }
+});
+</script>
+{% endblock %}

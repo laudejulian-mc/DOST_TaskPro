@@ -1,0 +1,793 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" x-data="{ 
+    darkMode: localStorage.getItem('darkMode') === 'true'
+}" :class="{ 'dark': darkMode }">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Beneficiary Dashboard{% endblock %}</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Alpine.js for interactivity -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- Material Icons CDN -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="{% static 'img/dost.png' %}" type="image/png">
+
+  {% block styles %}{% endblock %}
+
+  <style>
+    /* Hide Alpine.js elements until initialized */
+    [x-cloak] { display: none !important; }
+    
+    .active-nav {
+      background-color: #ffffff33;
+      color: #ffffff !important;
+      font-weight: 600;
+    }
+    .hover-card:hover {
+      transform: translateY(-5px) scale(1.02);
+    }
+    
+    /* ========================================
+       SIMPLE MODE STYLES
+       ======================================== */
+    .simple-mode .advanced-feature,
+    .simple-mode .chart-section,
+    .simple-mode .analytics-section { display: none !important; }
+    
+    /* Larger text */
+    .simple-mode { font-size: 16px !important; }
+    .simple-mode .text-xs { font-size: 0.9rem !important; }
+    .simple-mode .text-sm { font-size: 1rem !important; }
+    .simple-mode .text-base { font-size: 1.1rem !important; }
+    
+    /* Bigger buttons */
+    .simple-mode button,
+    .simple-mode .btn,
+    .simple-mode input[type="submit"] {
+      padding: 12px 20px !important;
+      font-size: 1rem !important;
+      min-height: 44px !important;
+    }
+    
+    /* Cleaner tables */
+    .simple-mode table td, .simple-mode table th { 
+      padding: 1rem 1.25rem !important; 
+      font-size: 0.95rem !important;
+    }
+    
+    /* Better forms */
+    .simple-mode input[type="text"],
+    .simple-mode input[type="email"],
+    .simple-mode input[type="password"],
+    .simple-mode select,
+    .simple-mode textarea {
+      padding: 14px 16px !important;
+      font-size: 1rem !important;
+      min-height: 48px !important;
+    }
+    
+    /* Simple mode indicator */
+    .simple-mode-indicator {
+      position: fixed; bottom: 20px; right: 20px;
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: white; padding: 12px 20px; border-radius: 30px;
+      font-size: 14px; font-weight: 600; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+      z-index: 9999; display: flex; align-items: center; gap: 8px; cursor: pointer;
+    }
+    .simple-mode-indicator:hover { transform: scale(1.05); }
+
+    /* Dark Mode Styles */
+    .dark {
+      --bg-primary: #1f2937;
+      --bg-secondary: #111827;
+      --bg-tertiary: #374151;
+      --text-primary: #f9fafb;
+      --text-secondary: #d1d5db;
+      --border-color: #4b5563;
+      --sidebar-bg: #1e3a8a;
+      --sidebar-hover: #3b82f6;
+      --header-bg: #0f172a;
+      --card-bg: #374151;
+    }
+
+    .dark body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    /* General text color override for dark mode - ensure all text is visible */
+    .dark * {
+      color: var(--text-primary);
+    }
+
+    /* Specific overrides for better contrast */
+    .dark .text-gray-800,
+    .dark .text-black,
+    .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+    .dark p, .dark span, .dark div, .dark label {
+      color: var(--text-primary) !important;
+    }
+
+    .dark #sidebar {
+      background: linear-gradient(135deg, var(--sidebar-bg) 0%, #1e40af 100%);
+    }
+
+    .dark header {
+      background-color: var(--header-bg);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .dark .bg-white {
+      background-color: var(--card-bg) !important;
+    }
+
+    .dark .text-gray-800 {
+      color: var(--text-primary) !important;
+    }
+
+    .dark .text-gray-600 {
+      color: var(--text-secondary) !important;
+    }
+
+    .dark .text-gray-700 {
+      color: var(--text-secondary) !important;
+    }
+
+    .dark .text-gray-500 {
+      color: #9ca3af !important;
+    }
+
+    .dark .text-gray-400 {
+      color: #d1d5db !important;
+    }
+
+    .dark .text-gray-300 {
+      color: #d1d5db !important;
+    }
+
+    .dark .text-black {
+      color: var(--text-primary) !important;
+    }
+
+    .dark .text-white {
+      color: var(--bg-primary) !important;
+    }
+
+    .dark .text-blue-600 {
+      color: #60a5fa !important;
+    }
+
+    .dark .text-red-600 {
+      color: #f87171 !important;
+    }
+
+    .dark .text-green-600 {
+      color: #4ade80 !important;
+    }
+
+    .dark .text-yellow-600 {
+      color: #fbbf24 !important;
+    }
+
+    .dark .text-purple-600 {
+      color: #a78bfa !important;
+    }
+
+    .dark .hover\:text-blue-400:hover {
+      color: #60a5fa !important;
+    }
+
+    .dark .hover\:text-red-800:hover {
+      color: #f87171 !important;
+    }
+
+    /* Additional dark mode styles for better UX */
+    .dark input, .dark textarea, .dark select {
+      background-color: var(--bg-secondary) !important;
+      border-color: var(--border-color) !important;
+      color: var(--text-primary) !important;
+    }
+
+    .dark input::placeholder, .dark textarea::placeholder {
+      color: #6b7280 !important;
+    }
+
+    .dark input:focus, .dark textarea:focus, .dark select:focus {
+      border-color: #3b82f6 !important;
+      box-shadow: 0 0 0 1px #3b82f6 !important;
+    }
+
+    .dark .bg-gray-100 {
+      background-color: var(--bg-tertiary) !important;
+    }
+
+    .dark .bg-red-50 {
+      background-color: rgba(239, 68, 68, 0.1) !important;
+    }
+
+    .dark .bg-blue-50 {
+      background-color: rgba(59, 130, 246, 0.1) !important;
+    }
+
+    /* Sidebar text should remain light on dark background */
+    .dark #sidebar,
+    .dark #sidebar * {
+      color: #ffffff !important;
+    }
+
+    .dark #sidebar .text-gray-300 {
+      color: #d1d5db !important;
+    }
+
+    .dark #sidebar .text-gray-600 {
+      color: #9ca3af !important;
+    }
+
+    .dark .border-gray-200 {
+      border-color: var(--border-color) !important;
+    }
+
+    .dark .shadow {
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+    }
+
+    .dark .bg-gray-50 {
+      background-color: var(--bg-secondary) !important;
+    }
+
+    .dark .bg-blue-50 {
+      background-color: rgba(59, 130, 246, 0.1) !important;
+    }
+
+    .dark .text-blue-600 {
+      color: #60a5fa !important;
+    }
+
+    /* Theme Toggle Button */
+    .theme-toggle {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .theme-toggle:hover {
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+
+    .dark .theme-toggle:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .theme-toggle .material-icons {
+      font-size: 24px;
+      transition: transform 0.3s ease;
+    }
+    
+    /* ========================================
+       PRINT-FRIENDLY STYLES
+       ======================================== */
+    @media print {
+      #sidebar, #overlay, header, nav, .no-print, button:not(.print-include),
+      .btn:not(.print-include), a.btn:not(.print-include), #menu-btn,
+      #notifBtn, #notifDropdown { display: none !important; }
+      
+      body {
+        background: white !important; color: black !important;
+        font-size: 11pt !important; line-height: 1.4 !important;
+        -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+      }
+      
+      .min-h-screen, .flex-1, main { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+      .p-6 { padding: 10px !important; }
+      
+      table { page-break-inside: auto !important; }
+      tr { page-break-inside: avoid !important; }
+      thead { display: table-header-group !important; }
+      
+      .bg-white, .shadow, .shadow-lg, .rounded-xl, .rounded-lg {
+        box-shadow: none !important; border: 1px solid #ddd !important;
+        page-break-inside: avoid !important;
+      }
+      
+      @page { size: A4 landscape; margin: 1cm; }
+      
+      body::before {
+        content: "DOST Biliran - Project Monitoring System";
+        display: block; text-align: center; font-size: 16pt; font-weight: bold;
+        margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid #0072CE;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans">
+
+  <div class="min-h-screen flex flex-col md:flex-row">
+    <!-- Sidebar -->
+  <aside id="sidebar" 
+      class="w-64 bg-[#0072CE] text-white shadow-lg flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
+      <!-- Header -->
+      <div class="flex items-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 shadow-md border-b border-blue-700">
+        <a href="{% url 'beneficiary_dashboard_url' %}" class="flex items-center hover:opacity-90 transition-opacity duration-200">
+          <img src="{% static 'img/dost.png' %}" 
+               alt="DOST Logo" 
+               class="h-12 w-12 rounded-full border-2 border-white shadow-lg transition-transform duration-300 hover:scale-110 cursor-pointer">
+          <div class="ml-3 flex flex-col">
+            <span class="text-2xl font-extrabold text-white drop-shadow-md leading-tight">TaskPro</span>
+            <span class="text-xs text-blue-200 font-medium">DOST Biliran</span>
+          </div>
+        </a>
+      </div>
+
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-4 py-6 flex flex-col space-y-2">
+
+          <!-- Profile Section -->
+        <div class="flex flex-col items-center mb-2">
+            {% if user.profile_picture %}
+                <img src="{{ user.profile_picture.url }}" 
+                    alt="{{ user.get_full_name }}" 
+                    class="h-16 w-16 rounded-full border-2 border-[#0072CE] shadow-md object-cover">
+            {% else %}
+                <img src="https://via.placeholder.com/64" 
+                    alt="User" 
+                    class="h-16 w-16 rounded-full border-2 border-[#0072CE] shadow-md object-cover">
+            {% endif %}
+            <span class="mt-3 font-semibold text-white text-center">{{ user.get_full_name }}</span>
+            <span class="text-gray-300 text-sm text-center">
+                {% if user.role == 'admin' %}
+                    base
+                {% elif user.role == 'dost_base' %}
+                    PSTO Staff
+                {% else %}
+                    {{ user.role|capfirst }}
+                {% endif %}
+            </span>
+
+        </div>
+
+        <a href="{% url 'beneficiary_dashboard_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'beneficiary_dashboard_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">dashboard</span>
+            <span class="ml-3 font-medium">Dashboard</span>
+        </a>
+
+        <a href="{% url 'beneficiary_projects_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'beneficiary_projects_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">business</span>
+            <span class="ml-3 font-medium">My Projects</span>
+        </a>
+
+        <a href="{% url 'beneficiary_forms_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'beneficiary_forms_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">folder</span>
+            <span class="ml-3 font-medium">Forms</span>
+        </a>
+
+        <a href="{% url 'beneficiary_messages_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'beneficiary_messages_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">message</span>
+            <span class="ml-3 font-medium">Messages</span>
+        </a>
+
+        <a href="{% url 'beneficiary_group_chats_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'beneficiary_group_chats_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">chat</span>
+            <span class="ml-3 font-medium">Group Chats</span>
+        </a>
+
+        <a href="{% url 'beneficiary_announcements_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'beneficiary_announcements_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">announcement</span>
+            <span class="ml-3 font-medium">Announcements</span>
+        </a>
+
+        <a href="{% url 'beneficiary_settings_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'beneficiary_settings_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">settings</span>
+            <span class="ml-3 font-medium">Settings</span>
+        </a>
+
+
+        <a href="{% url 'logout_url' %}" 
+            class="flex items-center px-3 py-2 rounded-lg transition duration-200
+            {% if request.resolver_match.url_name == 'logout_url' %} 
+              bg-white text-[#0072CE] 
+            {% else %} 
+              text-white hover:bg-white hover:text-[#0072CE] 
+            {% endif %}">
+              <span class="material-icons">logout</span>
+              <span class="ml-3 font-medium">Logout</span>
+          </a>
+      </nav>
+    </aside>
+
+    <!-- Overlay for Mobile -->
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden md:hidden z-40"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col w-full">
+      <!-- Top Navbar -->
+      <header class="bg-white shadow-md rounded-b-xl px-6 py-4 flex justify-between items-center sticky top-0 z-30 transition-all duration-300">
+        <div class="flex items-center space-x-4">
+          <button id="menu-btn" class="md:hidden text-gray-700 focus:outline-none hover:text-[#0072CE] transition">
+            <span class="material-icons">menu</span>
+          </button>
+          <h1 class="text-xl font-bold text-gray-800">
+            {% block page-title %}Dashboard{% endblock %}
+          </h1>
+
+        </div>
+       <div class="flex items-center gap-3">
+          <!-- Theme Toggle Button -->
+          <button id="theme-toggle" class="theme-toggle" title="Toggle Dark/Light Mode">
+            <span class="material-icons">dark_mode</span>
+          </button>
+
+          <!-- Notification Bell -->
+          <div class="relative">
+            <button id="notifBtn" class="relative">
+              <span class="material-icons text-gray-600 cursor-pointer hover:text-[#0072CE] transition dark:text-gray-300 dark:hover:text-blue-400">
+                  notifications
+              </span>
+
+              {% if unread_notifications_count > 0 %}
+              <span
+                  class="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  {{ unread_notifications_count }}
+              </span>
+              {% endif %}
+            </button>
+
+            <!-- Dropdown -->
+            <div id="notifDropdown"
+                class="hidden absolute right-0 mt-3 w-80 max-w-[calc(100vw-2rem)] bg-white shadow-lg rounded-lg border z-[9999]">
+
+
+              <div class="px-4 py-2 border-b font-semibold text-gray-700 flex justify-between items-center">
+                  <span>Notifications</span>
+                  <div class="flex items-center space-x-2">
+                      {% if notifications_list %}
+                      <button type="button" 
+                          onclick="clearAllNotifications()"
+                          class="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50"
+                          title="Clear all notifications">
+                          Clear All
+                      </button>
+                      {% endif %}
+                      <button type="button" 
+                          onclick="closeNotifications()"
+                          class="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                          title="Close notifications">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                      </button>
+                  </div>
+              </div>
+
+              <ul class="max-h-80 overflow-y-auto">
+                  {% if notifications_list %}
+                      {% for notif in notifications_list %}
+                      <li class="border-b">
+                          <a href="{{ notif.link }}"
+                            data-id="{{ notif.id }}"
+                            class="flex items-start gap-3 p-3 hover:bg-gray-50 notification-item {% if notif.status == 'unread' %}bg-blue-50{% endif %}">
+                            
+                              <span class="material-icons text-[#0072CE] text-lg">circle_notifications</span>
+
+                              <div class="flex-1">
+                                  <p class="text-sm text-gray-700">{{ notif.message }}</p>
+                                  <p class="text-xs text-gray-500">{{ notif.timestamp|date:"M d, Y h:i A" }}</p>
+                              </div>
+
+                              {% if notif.status == 'unread' %}
+                              <span class="w-2 h-2 bg-red-500 rounded-full mt-1"></span>
+                              {% endif %}
+                          </a>
+
+                      </li>
+                      {% endfor %}
+                  {% else %}
+                      <li class="p-4 text-center text-gray-500 text-sm">No notifications</li>
+                  {% endif %}
+              </ul>
+          </div>
+        </div>
+
+<script>
+    const notifBtn = document.getElementById("notifBtn");
+    const notifDropdown = document.getElementById("notifDropdown");
+
+    notifBtn.addEventListener("click", () => {
+        notifDropdown.classList.toggle("hidden");
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener("click", function (event) {
+        if (!notifBtn.contains(event.target) && !notifDropdown.contains(event.target)) {
+            notifDropdown.classList.add("hidden");
+        }
+    });
+
+    // Mark notification as read when clicked
+    document.querySelectorAll(".notification-item").forEach(item => {
+        item.addEventListener("click", function () {
+            const notifId = this.dataset.id;
+
+            fetch(`/notifications/read/${notifId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Marked as read:", data.success);
+                });
+        });
+    });
+
+    // Clear all notifications function
+    function clearAllNotifications() {
+        if (!confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
+            return;
+        }
+        
+        fetch('/notifications/clear-all/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update notification count
+                const badge = document.getElementById('notifBadge');
+                if (badge) {
+                    badge.remove();
+                }
+                
+                // Clear the notification list
+                document.querySelector('#notifDropdown ul').innerHTML = 
+                    '<li class="p-4 text-center text-gray-500 text-sm">No notifications</li>';
+                    
+                // Hide the clear all button
+                const clearButton = document.querySelector('button[onclick="clearAllNotifications()"]');
+                if (clearButton) {
+                    clearButton.style.display = 'none';
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Close notifications dropdown
+    function closeNotifications() {
+        const notifDropdown = document.getElementById("notifDropdown");
+        notifDropdown.classList.add("hidden");
+    }
+
+    // Theme Toggle Functionality
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = themeToggle.querySelector('.material-icons');
+    const html = document.documentElement;
+
+    // Check for saved theme preference or default to light mode
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (savedTheme === 'dark') {
+        html.classList.add('dark');
+        themeIcon.textContent = 'light_mode';
+    } else {
+        themeIcon.textContent = 'dark_mode';
+    }
+
+    themeToggle.addEventListener('click', () => {
+        if (html.classList.contains('dark')) {
+            html.classList.remove('dark');
+            themeIcon.textContent = 'dark_mode';
+            localStorage.setItem('theme', 'light');
+        } else {
+            html.classList.add('dark');
+            themeIcon.textContent = 'light_mode';
+            localStorage.setItem('theme', 'dark');
+        }
+    });
+</script>
+      </header>
+
+      <!-- Page Content -->
+      <div class="p-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Sidebar JS -->
+  <script>
+    const menuBtn = document.getElementById("menu-btn");
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("overlay");
+
+    menuBtn.addEventListener("click", () => {
+      sidebar.classList.toggle("-translate-x-full");
+      overlay.classList.toggle("hidden");
+    });
+
+    overlay.addEventListener("click", () => {
+      sidebar.classList.add("-translate-x-full");
+      overlay.classList.add("hidden");
+    });
+  </script>
+
+  <!-- Notification Polling Script -->
+  <script>
+    function pollNotifications() {
+      fetch('/notifications/count/')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const badge = document.querySelector('#notifBtn .bg-red-600');
+            const notifBtn = document.getElementById('notifBtn');
+            
+            if (data.unread_count > 0) {
+              if (badge) {
+                badge.textContent = data.unread_count;
+              } else if (notifBtn) {
+                const newBadge = document.createElement('span');
+                newBadge.className = 'absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full';
+                newBadge.textContent = data.unread_count;
+                notifBtn.appendChild(newBadge);
+              }
+            } else if (badge) {
+              badge.remove();
+            }
+          }
+        })
+        .catch(err => console.log('Notification poll error:', err));
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(pollNotifications, 5000);
+      setInterval(pollNotifications, 30000);
+    });
+  </script>
+
+  <!-- Session Timeout Warning Script -->
+  <script>
+    (function() {
+      const SESSION_TIMEOUT = 30 * 60 * 1000;
+      const WARNING_BEFORE = 5 * 60 * 1000;
+      let lastActivity = Date.now();
+      let warningShown = false;
+      let warningModal = null;
+      
+      const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+      
+      function resetTimer() {
+        lastActivity = Date.now();
+        if (warningShown && warningModal) {
+          warningModal.remove();
+          warningShown = false;
+        }
+      }
+      
+      activityEvents.forEach(event => {
+        document.addEventListener(event, resetTimer, { passive: true });
+      });
+      
+      function createWarningModal() {
+        const modal = document.createElement('div');
+        modal.id = 'sessionWarningModal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+        modal.innerHTML = `
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4">
+            <div class="flex items-center mb-4">
+              <span class="material-icons text-yellow-500 text-3xl mr-3">warning</span>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Session Expiring Soon</h3>
+            </div>
+            <p class="text-gray-600 dark:text-gray-300 mb-4">
+              Your session will expire in <span id="countdownTimer" class="font-bold text-red-600">5:00</span> due to inactivity.
+            </p>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">
+              Click "Stay Logged In" to continue your session, or you will be automatically logged out.
+            </p>
+            <div class="flex justify-end space-x-3">
+              <a href="/" class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                Logout Now
+              </a>
+              <button id="stayLoggedInBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Stay Logged In
+              </button>
+            </div>
+          </div>
+        `;
+        return modal;
+      }
+      
+      function showWarning() {
+        if (warningShown) return;
+        warningShown = true;
+        warningModal = createWarningModal();
+        document.body.appendChild(warningModal);
+        
+        let remainingSeconds = WARNING_BEFORE / 1000;
+        const timerEl = document.getElementById('countdownTimer');
+        
+        const countdown = setInterval(() => {
+          remainingSeconds--;
+          const mins = Math.floor(remainingSeconds / 60);
+          const secs = remainingSeconds % 60;
+          if (timerEl) timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+          if (remainingSeconds <= 0) {
+            clearInterval(countdown);
+            window.location.href = '/';
+          }
+        }, 1000);
+        
+        document.getElementById('stayLoggedInBtn').addEventListener('click', function() {
+          clearInterval(countdown);
+          fetch('/notifications/count/', { credentials: 'same-origin' }).then(() => resetTimer());
+        });
+      }
+      
+      setInterval(() => {
+        const elapsed = Date.now() - lastActivity;
+        const timeUntilExpiry = SESSION_TIMEOUT - elapsed;
+        if (timeUntilExpiry <= WARNING_BEFORE && !warningShown) showWarning();
+        if (elapsed >= SESSION_TIMEOUT) window.location.href = '/';
+      }, 30000);
+    })();
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,342 @@
+{% extends "administrator/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Edit Project{% endblock %}
+{% block nav-projects %}active-nav{% endblock %}
+{% block page-title %}Edit Project{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb mb-4">
+        <a href="{% url 'administrator_dashboard_url' %}">Dashboard</a>
+        <span class="separator">›</span>
+        <a href="{% url 'administrator_projects_url' %}">Projects</a>
+        <span class="separator">›</span>
+        <a href="{% url 'administrator_projects_detail_url' project.pk %}">{{ project.project_title|truncatewords:5 }}</a>
+        <span class="separator">›</span>
+        <span class="current">Edit</span>
+    </nav>
+
+    <!-- Header -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold">Edit Project</h1>
+                    <p class="text-amber-100 mt-1">{{ project.project_title }}</p>
+                </div>
+                <a href="{% url 'administrator_projects_detail_url' project.pk %}" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <span class="material-icons text-sm">arrow_back</span>
+                    Back to Details
+                </a>
+            </div>
+        </div>
+
+        <form method="POST" action="{% url 'administrator_projects_update_url' project.pk %}" enctype="multipart/form-data" class="p-6">
+            {% csrf_token %}
+            
+            <!-- Tab Navigation -->
+            <div x-data="{ activeTab: 'identification' }" class="space-y-6">
+                <div class="flex flex-wrap gap-2 border-b pb-4">
+                    <button type="button" @click="activeTab = 'identification'" 
+                            :class="activeTab === 'identification' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+                            class="px-4 py-2 rounded-lg font-medium transition">
+                        Identification
+                    </button>
+                    <button type="button" @click="activeTab = 'basic'" 
+                            :class="activeTab === 'basic' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+                            class="px-4 py-2 rounded-lg font-medium transition">
+                        Basic Info
+                    </button>
+                    <button type="button" @click="activeTab = 'location'" 
+                            :class="activeTab === 'location' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+                            class="px-4 py-2 rounded-lg font-medium transition">
+                        Location
+                    </button>
+                    <button type="button" @click="activeTab = 'beneficiaries'" 
+                            :class="activeTab === 'beneficiaries' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+                            class="px-4 py-2 rounded-lg font-medium transition">
+                        Beneficiaries
+                    </button>
+                    <button type="button" @click="activeTab = 'financial'" 
+                            :class="activeTab === 'financial' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+                            class="px-4 py-2 rounded-lg font-medium transition">
+                        Financial
+                    </button>
+                    <button type="button" @click="activeTab = 'dates'" 
+                            :class="activeTab === 'dates' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+                            class="px-4 py-2 rounded-lg font-medium transition">
+                        Dates
+                    </button>
+                    <button type="button" @click="activeTab = 'documents'" 
+                            :class="activeTab === 'documents' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+                            class="px-4 py-2 rounded-lg font-medium transition">
+                        Documents
+                    </button>
+                </div>
+
+                <!-- Identification Tab -->
+                <div x-show="activeTab === 'identification'" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">No.</label>
+                        <input type="number" name="no" value="{{ project.no|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Project Code</label>
+                        <input type="text" name="project_code" value="{{ project.project_code|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                        <input type="number" name="year" value="{{ project.year|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+
+                <!-- Basic Info Tab -->
+                <div x-show="activeTab === 'basic'" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Project Title *</label>
+                        <textarea name="project_title" rows="2" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ project.project_title|default:'' }}</textarea>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Agency/Grantee</label>
+                            <input type="text" name="agency_grantee" value="{{ project.agency_grantee|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Program</label>
+                            <select name="program" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Select Program</option>
+                                <option value="SETUP" {% if project.program == 'SETUP' %}selected{% endif %}>SETUP</option>
+                                <option value="GIA" {% if project.program == 'GIA' %}selected{% endif %}>GIA</option>
+                                <option value="STARBOOKS" {% if project.program == 'STARBOOKS' %}selected{% endif %}>STARBOOKS</option>
+                                <option value="CEST" {% if project.program == 'CEST' %}selected{% endif %}>CEST</option>
+                                <option value="Other" {% if project.program == 'Other' %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Type of Project</label>
+                            <select name="type_of_project" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Select Type</option>
+                                <option value="New" {% if project.type_of_project == 'New' %}selected{% endif %}>New</option>
+                                <option value="Expansion" {% if project.type_of_project == 'Expansion' %}selected{% endif %}>Expansion</option>
+                                <option value="Rehabilitation" {% if project.type_of_project == 'Rehabilitation' %}selected{% endif %}>Rehabilitation</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <select name="status" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Select Status</option>
+                                <option value="Ongoing" {% if project.status == 'Ongoing' %}selected{% endif %}>Ongoing</option>
+                                <option value="Completed" {% if project.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                <option value="Terminated" {% if project.status == 'Terminated' %}selected{% endif %}>Terminated</option>
+                                <option value="On Hold" {% if project.status == 'On Hold' %}selected{% endif %}>On Hold</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+                        <textarea name="remarks" rows="2" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ project.remarks|default:'' }}</textarea>
+                    </div>
+                </div>
+
+                <!-- Location Tab -->
+                <div x-show="activeTab === 'location'" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Municipality</label>
+                        <select name="mun" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Select Municipality</option>
+                            <option value="Almeria" {% if project.mun == 'Almeria' %}selected{% endif %}>Almeria</option>
+                            <option value="Biliran" {% if project.mun == 'Biliran' %}selected{% endif %}>Biliran</option>
+                            <option value="Cabucgayan" {% if project.mun == 'Cabucgayan' %}selected{% endif %}>Cabucgayan</option>
+                            <option value="Caibiran" {% if project.mun == 'Caibiran' %}selected{% endif %}>Caibiran</option>
+                            <option value="Culaba" {% if project.mun == 'Culaba' %}selected{% endif %}>Culaba</option>
+                            <option value="Kawayan" {% if project.mun == 'Kawayan' %}selected{% endif %}>Kawayan</option>
+                            <option value="Maripipi" {% if project.mun == 'Maripipi' %}selected{% endif %}>Maripipi</option>
+                            <option value="Naval" {% if project.mun == 'Naval' %}selected{% endif %}>Naval</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                        <input type="text" name="province" value="{{ project.province|default:'Biliran' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">District</label>
+                        <input type="text" name="district" value="{{ project.district|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+
+                <!-- Beneficiaries Tab -->
+                <div x-show="activeTab === 'beneficiaries'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Beneficiary Name</label>
+                            <input type="text" name="beneficiary" value="{{ project.beneficiary|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Beneficiary Address</label>
+                            <input type="text" name="beneficiary_address" value="{{ project.beneficiary_address|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contact Details</label>
+                            <input type="text" name="contact_details" value="{{ project.contact_details|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Proponent Details</label>
+                            <input type="text" name="proponent_details" value="{{ project.proponent_details|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">No. of Beneficiaries</label>
+                            <input type="number" name="no_of_beneficiaries" value="{{ project.no_of_beneficiaries|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Male</label>
+                            <input type="number" name="male" value="{{ project.male|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Female</label>
+                            <input type="number" name="female" value="{{ project.female|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financial Tab -->
+                <div x-show="activeTab === 'financial'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fund Source</label>
+                            <input type="text" name="fund_source" value="{{ project.fund_source|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Funds (₱)</label>
+                            <input type="number" step="0.01" name="funds" value="{{ project.funds|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Total Project Cost (₱)</label>
+                            <input type="number" step="0.01" name="total_project_cost" value="{{ project.total_project_cost|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Counterpart Funds (₱)</label>
+                            <input type="number" step="0.01" name="counterpart_funds" value="{{ project.counterpart_funds|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Total Funds Released (₱)</label>
+                            <input type="number" step="0.01" name="total_funds_released" value="{{ project.total_funds_released|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">1st Tranche (₱)</label>
+                            <input type="number" step="0.01" name="first_tranche" value="{{ project.first_tranche|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">2nd Tranche (₱)</label>
+                            <input type="number" step="0.01" name="second_tranche" value="{{ project.second_tranche|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">3rd Tranche (₱)</label>
+                            <input type="number" step="0.01" name="third_tranche" value="{{ project.third_tranche|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dates Tab -->
+                <div x-show="activeTab === 'dates'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Project Start</label>
+                        <input type="date" name="project_start" value="{{ project.project_start|date:'Y-m-d' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Project End</label>
+                        <input type="date" name="project_end" value="{{ project.project_end|date:'Y-m-d' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date of Release</label>
+                        <input type="date" name="date_of_release" value="{{ project.date_of_release|date:'Y-m-d' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date of Completion</label>
+                        <input type="date" name="date_of_completion" value="{{ project.date_of_completion|date:'Y-m-d' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date of Donation</label>
+                        <input type="date" name="date_of_donation" value="{{ project.date_of_donation|date:'Y-m-d' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date of Inspection/Tagging</label>
+                        <input type="date" name="date_of_inspection_tagging" value="{{ project.date_of_inspection_tagging|date:'Y-m-d' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date of Liquidation</label>
+                        <input type="date" name="date_of_liquidation" value="{{ project.date_of_liquidation|date:'Y-m-d' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Original Project Duration</label>
+                        <input type="text" name="original_project_duration" value="{{ project.original_project_duration|default:'' }}" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+
+                <!-- Documents Tab -->
+                <div x-show="activeTab === 'documents'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Supporting Documents</label>
+                            <input type="file" name="supporting_documents" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            {% if project.supporting_documents %}
+                            <p class="text-sm text-gray-500 mt-1">Current: {{ project.supporting_documents.name }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Product Photo</label>
+                            <input type="file" name="product_photo" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            {% if project.product_photo %}
+                            <p class="text-sm text-gray-500 mt-1">Current: {{ project.product_photo.name }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Availed Technologies</label>
+                            <textarea name="availed_technologies" rows="2" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ project.availed_technologies|default:'' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Interventions</label>
+                            <textarea name="interventions" rows="2" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ project.interventions|default:'' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-between items-center pt-6 border-t border-gray-200">
+                    <a href="{% url 'administrator_projects_url' %}" class="bg-gray-500 hover:bg-gray-600 text-white font-medium px-6 py-2 rounded-lg flex items-center gap-2">
+                        <span class="material-icons text-sm">arrow_back</span>
+                        Return to Projects
+                    </a>
+                    <div class="flex gap-3">
+                        <a href="{% url 'administrator_projects_detail_url' project.pk %}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium px-6 py-2 rounded-lg">
+                            Cancel
+                        </a>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg flex items-center gap-2">
+                            <span class="material-icons text-sm">save</span>
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+{% endblock %}

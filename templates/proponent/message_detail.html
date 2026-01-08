@@ -1,0 +1,123 @@
+{% extends 'proponent/base.html' %}
+{% load static %}
+
+{% block title %}Message Details - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">{{ message.subject }}</h1>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Conversation with
+                            {% if message.sender == user %}
+                                {{ message.recipient.get_full_name }}
+                            {% else %}
+                                {{ message.sender.get_full_name }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <a href="{% url 'proponent_messages_url' %}"
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200">
+                        <span class="material-icons text-sm mr-2">arrow_back</span>
+                        Back to Messages
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-4xl">
+            <!-- Message Thread -->
+            <div class="bg-white rounded-lg shadow-sm border mb-6">
+                <div class="p-6">
+                    <div class="space-y-6">
+                        {% for thread_message in thread_messages %}
+                        <div class="flex {% if thread_message.sender == user %}justify-end{% else %}justify-start{% endif %}">
+                            <div class="max-w-lg {% if thread_message.sender == user %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-900{% endif %} rounded-lg px-4 py-3">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <div class="w-6 h-6 {% if thread_message.sender == user %}bg-blue-500{% else %}bg-gray-300{% endif %} rounded-full flex items-center justify-center">
+                                        <span class="text-xs font-medium">
+                                            {{ thread_message.sender.first_name|first|upper }}{{ thread_message.sender.last_name|first|upper }}
+                                        </span>
+                                    </div>
+                                    <span class="text-xs font-medium">
+                                        {{ thread_message.sender.get_full_name }}
+                                        {% if thread_message.sender == user %}
+                                            (You)
+                                        {% endif %}
+                                    </span>
+                                    <span class="text-xs opacity-75">
+                                        {{ thread_message.created_at|date:"M d, Y H:i" }}
+                                    </span>
+                                </div>
+                                {% if thread_message.parent_message and thread_message != message %}
+                                <div class="text-xs opacity-75 mb-2 border-l-2 pl-2">
+                                    Re: {{ thread_message.parent_message.subject }}
+                                </div>
+                                {% endif %}
+                                <div class="whitespace-pre-wrap">{{ thread_message.content }}</div>
+                                {% if thread_message.attachment %}
+                                <div class="mt-3 pt-3 border-t border-opacity-20">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="material-icons text-sm">attach_file</span>
+                                        <a href="{{ thread_message.attachment.url }}" target="_blank"
+                                           class="text-sm underline hover:no-underline">
+                                            {{ thread_message.attachment.name }}
+                                        </a>
+                                        <span class="text-xs opacity-75">
+                                            ({{ thread_message.attachment.size|filesizeformat }})
+                                        </span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reply Form -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Reply to Message</h2>
+                <form method="post" enctype="multipart/form-data" class="space-y-4">
+                    {% csrf_token %}
+
+                    <div>
+                        <label for="reply_content" class="block text-sm font-medium text-gray-700 mb-2">
+                            Your Reply *
+                        </label>
+                        <textarea name="reply_content" id="reply_content" rows="6" required
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="Type your reply here..."></textarea>
+                    </div>
+
+                    <div>
+                        <label for="reply_attachment" class="block text-sm font-medium text-gray-700 mb-2">
+                            Attachment (optional)
+                        </label>
+                        <input type="file" name="reply_attachment" id="reply_attachment"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.rar">
+                        <p class="mt-1 text-xs text-gray-500">Supported formats: PDF, DOC, DOCX, TXT, JPG, PNG, GIF, ZIP, RAR (Max 10MB)</p>
+                    </div>
+
+                    <div class="flex items-center justify-end">
+                        <button type="submit"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200">
+                            <span class="material-icons text-sm mr-2">send</span>
+                            Send Reply
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

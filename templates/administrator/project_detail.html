@@ -1,0 +1,323 @@
+{% extends "administrator/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Project Details{% endblock %}
+{% block nav-projects %}active-nav{% endblock %}
+{% block page-title %}Project Details{% endblock %}
+
+{% block content %}
+<!-- Top Navigation -->
+<div class="max-w-4xl mx-auto mb-4 flex justify-between items-center">
+    <a href="{% url 'administrator_projects_url' %}" class="bg-gray-500 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+        <span class="material-icons text-sm">arrow_back</span>
+        Back to Projects
+    </a>
+    <div class="flex gap-2">
+        <!-- Gantt Chart -->
+        <a href="{% url 'project_gantt_url' project.pk %}" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-1">
+            <span class="material-icons text-sm">timeline</span>
+            Gantt Chart
+        </a>
+        <!-- Sign Project -->
+        <button type="button" onclick="openSignatureModal('project', '{{ project.pk }}')" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-1">
+            <span class="material-icons text-sm">draw</span>
+            Sign
+        </button>
+        <!-- Edit Project -->
+        <a href="{% url 'administrator_projects_update_url' project.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-1">
+            <span class="material-icons text-sm">edit</span>
+            Edit Project
+        </a>
+    </div>
+</div>
+
+<div class="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-bold">{{ project.project_title }}</h1>
+                <p class="text-blue-100 mt-1">Project ID: {{ project.id }}</p>
+            </div>
+            <div class="text-right">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                    {% if project.status == 'completed' %}bg-green-100 text-green-800
+                    {% elif project.status == 'ongoing' %}bg-blue-100 text-blue-800
+                    {% elif project.status == 'approved' %}bg-yellow-100 text-yellow-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ project.status|title }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="p-6">
+        <!-- Project Information -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Basic Information -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Basic Information</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">Program</label>
+                        <p class="text-gray-800">{{ project.program|default:"-" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">Type of Project</label>
+                        <p class="text-gray-800">{{ project.type_of_project|default:"-" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">Fund Source</label>
+                        <p class="text-gray-800">{{ project.fund_source|default:"-" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">Project Leader</label>
+                        <p class="text-gray-800">{{ project.project_leader.get_full_name|default:"-" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Information -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Location</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">Municipality</label>
+                        <p class="text-gray-800">{{ project.mun|default:"-" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">Province</label>
+                        <p class="text-gray-800">{{ project.province|default:"-" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">District</label>
+                        <p class="text-gray-800">{{ project.district|default:"-" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-600">Barangay</label>
+                        <p class="text-gray-800">{{ project.barangay|default:"-" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Beneficiaries -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Beneficiaries</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ project.male|default:0 }}</div>
+                    <div class="text-sm text-gray-600">Male</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-pink-600">{{ project.female|default:0 }}</div>
+                    <div class="text-sm text-gray-600">Female</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-purple-600">{{ project.senior_citizen|default:0 }}</div>
+                    <div class="text-sm text-gray-600">Senior Citizens</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600">{{ project.pwd|default:0 }}</div>
+                    <div class="text-sm text-gray-600">PWD</div>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-600">Total Beneficiaries</span>
+                    {% with male=project.male|default:0 female=project.female|default:0 %}
+                    {% if project.no_of_beneficiaries and project.no_of_beneficiaries > 0 %}
+                    <span class="text-lg font-bold text-gray-800">{{ project.no_of_beneficiaries }}</span>
+                    {% else %}
+                    <span class="text-lg font-bold text-gray-800">{{ male|add:female }}</span>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Information -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Financial Information</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="text-center p-4 bg-white rounded border">
+                    <div class="text-sm text-gray-600">Allocated Funds</div>
+                    <div class="text-xl font-bold text-blue-600">₱{{ project.funds|floatformat:2|intcomma }}</div>
+                </div>
+                <div class="text-center p-4 bg-white rounded border">
+                    <div class="text-sm text-gray-600">Funds Released</div>
+                    <div class="text-xl font-bold text-green-600">₱{{ project.total_funds_released|floatformat:2|intcomma }}</div>
+                </div>
+                <div class="text-center p-4 bg-white rounded border">
+                    <div class="text-sm text-gray-600">Amount Liquidated</div>
+                    <div class="text-xl font-bold text-orange-600">₱{{ project.amount_liquidated|floatformat:2|intcomma }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Timeline</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm font-medium text-gray-600">Project Start</label>
+                    <p class="text-gray-800">{{ project.project_start|date:"M d, Y"|default:"-" }}</p>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-600">Project End</label>
+                    <p class="text-gray-800">{{ project.project_end|date:"M d, Y"|default:"-" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Information -->
+        {% if project.contact_details or project.proponent_details %}
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
+            <div class="space-y-3">
+                {% if project.contact_details %}
+                <div>
+                    <label class="text-sm font-medium text-gray-600">Contact Details</label>
+                    <p class="text-gray-800">{{ project.contact_details }}</p>
+                </div>
+                {% endif %}
+                {% if project.proponent_details %}
+                <div>
+                    <label class="text-sm font-medium text-gray-600">Proponent Details</label>
+                    <p class="text-gray-800">{{ project.proponent_details }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Related Information -->
+        {% if proposal or budget %}
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Related Information</h3>
+            <div class="space-y-3">
+                {% if proposal %}
+                <div>
+                    <label class="text-sm font-medium text-gray-600">Related Proposal</label>
+                    <p class="text-gray-800">{{ proposal.title }}</p>
+                </div>
+                {% endif %}
+                {% if budget %}
+                <div>
+                    <label class="text-sm font-medium text-gray-600">Budget Source</label>
+                    <p class="text-gray-800">{{ budget.fund_source }} ({{ budget.fiscal_year }})</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Project Documents -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span class="material-icons text-blue-500">folder_open</span>
+                Project Documents
+            </h3>
+            {% if project.documents.all %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% for doc in project.documents.all %}
+                <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition group">
+                    <div class="flex-shrink-0">
+                        {% if doc.filename|lower|slice:"-4:" == ".pdf" %}
+                            <span class="material-icons text-red-500 text-2xl">picture_as_pdf</span>
+                        {% elif doc.filename|lower|slice:"-4:" == ".jpg" or doc.filename|lower|slice:"-5:" == ".jpeg" or doc.filename|lower|slice:"-4:" == ".png" or doc.filename|lower|slice:"-4:" == ".gif" %}
+                            <span class="material-icons text-green-500 text-2xl">image</span>
+                        {% elif doc.filename|lower|slice:"-5:" == ".docx" or doc.filename|lower|slice:"-4:" == ".doc" %}
+                            <span class="material-icons text-blue-500 text-2xl">description</span>
+                        {% elif doc.filename|lower|slice:"-5:" == ".xlsx" or doc.filename|lower|slice:"-4:" == ".xls" %}
+                            <span class="material-icons text-green-600 text-2xl">table_chart</span>
+                        {% else %}
+                            <span class="material-icons text-gray-500 text-2xl">insert_drive_file</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-800 truncate" title="{{ doc.filename }}">{{ doc.filename }}</p>
+                        <p class="text-xs text-gray-500">{{ doc.document_type|title }} • {{ doc.date_uploaded|date:"M d, Y" }}</p>
+                    </div>
+                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button onclick="previewDocument('{{ doc.file.url }}', '{{ doc.filename }}')" 
+                                class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                title="Preview">
+                            <span class="material-icons text-lg">visibility</span>
+                        </button>
+                        <a href="{{ doc.file.url }}" download 
+                           class="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+                           title="Download">
+                            <span class="material-icons text-lg">download</span>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-gray-500">
+                <span class="material-icons text-3xl mb-2">folder_off</span>
+                <p class="text-sm">No documents uploaded for this project</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Digital Signatures Section -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span class="material-icons text-green-500">verified</span>
+                Digital Signatures
+            </h3>
+            {% if project_signatures %}
+            <div class="space-y-3">
+                {% for sig in project_signatures %}
+                <div class="flex items-center gap-4 p-3 bg-white rounded-lg border border-green-200">
+                    <div class="flex-shrink-0">
+                        {% if sig.signature_image %}
+                            <img src="{{ sig.signature_image.url }}" alt="Signature" class="h-12 w-auto object-contain">
+                        {% elif sig.signature_data %}
+                            <img src="{{ sig.signature_data }}" alt="Signature" class="h-12 w-auto object-contain">
+                        {% else %}
+                            <span class="material-icons text-green-500 text-3xl">draw</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow">
+                        <p class="font-medium text-gray-800">{{ sig.user.get_full_name|default:sig.user.username }}</p>
+                        <p class="text-sm text-gray-500">
+                            {{ sig.signature_type|title }} • {{ sig.signed_at|date:"M d, Y g:i A" }}
+                        </p>
+                        {% if sig.remarks %}
+                        <p class="text-sm text-gray-600 mt-1">{{ sig.remarks }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex-shrink-0">
+                        {% if sig.is_verified %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span class="material-icons text-xs mr-1">check_circle</span>
+                            Verified
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <span class="material-icons text-xs mr-1">pending</span>
+                            Pending
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-gray-500">
+                <span class="material-icons text-3xl mb-2">draw</span>
+                <p class="text-sm">No signatures yet</p>
+                <button type="button" onclick="openSignatureModal('project', '{{ project.pk }}')" 
+                        class="mt-2 text-green-600 hover:text-green-700 text-sm font-medium">
+                    Be the first to sign
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

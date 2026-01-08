@@ -1,0 +1,85 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login | TaskPro</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Material Icons -->
+     <!-- Favicon -->
+    <link rel="shortcut icon" href="{% static 'img/dost.png' %}" type="image/png">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+
+<body class="bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center min-h-screen font-sans">
+
+    <div class="bg-white rounded-3xl shadow-2xl p-10 w-full max-w-md border-t-8 border-[#0072CE]">
+        <div class="flex flex-col items-center mb-6">
+            <img src="{% static 'img/dost.png' %}" alt="DOST Logo" class="h-16 w-16 mb-3 rounded-full shadow-md">
+            <h1 class="text-3xl font-extrabold text-gray-800">TaskPro</h1>
+            <p class="text-sm text-blue-600 font-medium">DOST Biliran</p>
+            <p class="text-gray-500 mt-1">Login to your account</p>
+        </div>
+
+        <!-- Django Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="p-3 mb-4 rounded flex items-center 
+                    {% if message.tags == 'error' %}
+                        bg-red-100 text-red-700
+                    {% elif message.tags == 'success' %}
+                        bg-green-100 text-green-700
+                    {% else %}
+                        bg-blue-100 text-blue-700
+                    {% endif %}">
+                    <span class="material-icons mr-2">
+                        {% if message.tags == 'error' %}
+                            error
+                        {% elif message.tags == 'success' %}
+                            check_circle
+                        {% else %}
+                            info
+                        {% endif %}
+                    </span>
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Login Form -->
+        <form method="POST" action="{% url 'index_url' %}" class="space-y-5">
+            {% csrf_token %}
+            <div>
+                <label class="block text-gray-700 font-medium mb-2">Email</label>
+                <div class="relative">
+                    <span class="material-icons absolute left-3 top-3 text-gray-400">email</span>
+                    <input type="email" name="email" 
+                        class="w-full pl-10 pr-3 py-2 border rounded-lg 
+                               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                        placeholder="you@example.com" required>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 font-medium mb-2">Password</label>
+                <div class="relative">
+                    <span class="material-icons absolute left-3 top-3 text-gray-400">lock</span>
+                    <input type="password" name="password" 
+                        class="w-full pl-10 pr-3 py-2 border rounded-lg 
+                               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                        placeholder="********" required>
+                </div>
+            </div>
+
+            <button type="submit" 
+                class="w-full bg-gradient-to-r from-[#0072CE] to-[#00ADEF] text-white py-2 rounded-lg 
+                       font-semibold hover:from-[#00509E] hover:to-[#0072CE] transition duration-300 
+                       shadow-md hover:shadow-lg flex items-center justify-center">
+                <span class="material-icons mr-2">login</span> Login
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>

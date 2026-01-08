@@ -1,0 +1,116 @@
+{% extends "staff/base.html" %}
+{% load static %}
+
+{% block title %}Downloadable Forms{% endblock %}
+{% block page-title %}Downloadable Forms{% endblock %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<div class="container mt-2">
+
+    <!-- ✅ Header -->
+    <div class="mb-4">
+        <p class="text-gray-600">Download form templates uploaded by the administrator.</p>
+    </div>
+
+    <!-- ✅ Category Filter -->
+    <div class="mb-4">
+        <label class="text-sm font-medium text-gray-700 mr-2">Filter by Category:</label>
+        <select id="categoryFilter" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+            <option value="">All Categories</option>
+            {% for value, label in categories %}
+                <option value="{{ label }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- ✅ Forms Table -->
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg p-4">
+        <table id="formsTable" class="min-w-full text-sm text-left text-gray-600">
+            <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Title</th>
+                    <th class="px-4 py-2">Description</th>
+                    <th class="px-4 py-2">Category</th>
+                    <th class="px-4 py-2">File Type</th>
+                    <th class="px-4 py-2">Upload Date</th>
+                    <th class="px-4 py-2 text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for form in forms %}
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2 font-medium">{{ form.title }}</td>
+                    <td class="px-4 py-2 text-gray-500">{{ form.description|default:"—"|truncatewords:15 }}</td>
+                    <td class="px-4 py-2">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium
+                            {% if form.category == 'general' %}bg-gray-200 text-gray-700
+                            {% elif form.category == 'project' %}bg-blue-200 text-blue-700
+                            {% elif form.category == 'budget' %}bg-green-200 text-green-700
+                            {% elif form.category == 'proposal' %}bg-purple-200 text-purple-700
+                            {% elif form.category == 'report' %}bg-yellow-200 text-yellow-700
+                            {% else %}bg-pink-200 text-pink-700{% endif %}">
+                            {{ form.get_category_display }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2">
+                        {% with ext=form.file.name|slice:"-4:" %}
+                            {% if '.pdf' in ext %}
+                                <span class="text-red-600">📄 PDF</span>
+                            {% elif '.doc' in ext %}
+                                <span class="text-blue-600">📝 DOC</span>
+                            {% elif '.xls' in ext %}
+                                <span class="text-green-600">📊 Excel</span>
+                            {% else %}
+                                <span class="text-gray-600">📁 File</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="px-4 py-2">{{ form.date_uploaded|date:"M d, Y" }}</td>
+                    <td class="px-4 py-2 text-center">
+                        <a href="{% url 'form_download_url' form.id %}"
+                            class="inline-flex items-center gap-1 px-4 py-2 text-white bg-green-500 rounded-lg hover:bg-green-600 text-sm font-medium">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Download
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        No forms available for download at this time.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Only initialize DataTables if there are data rows (not empty state with colspan)
+    if ($('#formsTable tbody tr').length > 0 && !$('#formsTable tbody tr td[colspan]').length) {
+        var table = $('#formsTable').DataTable({
+            "pageLength": 10,
+            "order": [[5, "desc"]],
+            "columnDefs": [
+                { "orderable": false, "targets": 6 }
+            ]
+        });
+
+        // Category filter
+        $('#categoryFilter').on('change', function() {
+            table.column(3).search(this.value).draw();
+        });
+    }
+});
+</script>
+{% endblock %}

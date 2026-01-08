@@ -1,0 +1,477 @@
+{% extends "administrator/base.html" %}
+{% load static %}
+
+{% block title %}User Management{% endblock %}
+{% block nav-users %}active-nav{% endblock %}
+{% block page-title %}User Management{% endblock %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<div class="container mt-2" x-data="{ 
+    openAdd: false, 
+    openEdit: false, 
+    openDelete: false, 
+    openMassDelete: false,
+    editUser: {}, 
+    deleteUser: {},
+    selectedIds: [],
+    selectAll: false,
+    toggleSelectAll() {
+        if (this.selectAll) {
+            this.selectedIds = [...document.querySelectorAll('.user-checkbox')].map(cb => cb.value);
+        } else {
+            this.selectedIds = [];
+        }
+    },
+    updateSelectAll() {
+        const allCheckboxes = document.querySelectorAll('.user-checkbox');
+        this.selectAll = this.selectedIds.length === allCheckboxes.length && allCheckboxes.length > 0;
+    }
+}">
+
+    <!-- ✅ Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white 
+                        {% if message.tags == 'success' %} bg-green-500 
+                        {% elif message.tags == 'error' %} bg-red-500 
+                        {% else %} bg-blue-500 {% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- ✅ Action Bar -->
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <button x-show="selectedIds.length > 0" @click="openMassDelete = true"
+                x-cloak
+                class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                Delete Selected (<span x-text="selectedIds.length"></span>)
+            </button>
+        </div>
+        <button @click="openAdd = true"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg shadow">
+            + Add User
+        </button>
+    </div>
+
+    <!-- ✅ Users Table -->
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg p-4">
+        <table id="usersTable" class="min-w-full text-sm text-left text-gray-600">
+            <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-4 py-2">
+                        <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" class="w-4 h-4 rounded border-gray-300">
+                    </th>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Username</th>
+                    <th class="px-4 py-2">Full Name</th>
+                    <th class="px-4 py-2">Email</th>
+                    <th class="px-4 py-2">Role</th>
+                    <th class="px-4 py-2">TNA Status</th>
+                    <th class="px-4 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td class="px-4 py-2">
+                        <input type="checkbox" value="{{ user.id }}" x-model="selectedIds" @change="updateSelectAll()" class="user-checkbox w-4 h-4 rounded border-gray-300">
+                    </td>
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2">{{ user.username }}</td>
+                    <td class="px-4 py-2">{{ user.full_name }}</td>
+                    <td class="px-4 py-2">{{ user.email }}</td>
+                    <td class="px-4 py-2">{{ user.get_role_display }}</td>
+                    <td class="px-4 py-2">
+                        {% if user.role == 'beneficiary' %}
+                            <span class="px-2 py-1 text-xs rounded-full 
+                                {% if user.tna_status == 'operational' %}bg-green-100 text-green-800
+                                {% elif user.tna_status == 'delivered' %}bg-blue-100 text-blue-800
+                                {% elif user.tna_status == 'completed' %}bg-purple-100 text-purple-800
+                                {% elif user.tna_status == 'in_progress' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {{ user.get_tna_status_display }}
+                            </span>
+                        {% else %}
+                            <span class="text-gray-400 text-xs">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button type="button"
+                                @click="editUser = {id: {{ user.id }}, first_name: '{{ user.first_name|escapejs }}', middle_name: '{{ user.middle_name|escapejs }}', last_name: '{{ user.last_name|escapejs }}', email: '{{ user.email }}', role: '{{ user.role }}', profile_picture: '{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}{% endif %}', tna_status: '{{ user.tna_status }}', tna_completion_date: '{{ user.tna_completion_date|date:"Y-m-d"|default:"" }}', tna_notes: '{{ user.tna_notes|escapejs|default:"" }}'}; openEdit = true"
+                                class="px-3 py-1 text-white bg-yellow-500 rounded hover:bg-yellow-600">
+                                Edit
+                            </button>
+                            <button type="button"
+                                @click="deleteUser = {id: {{ user.id }}, email: '{{ user.email }}'}; openDelete = true"
+                                class="px-3 py-1 text-white bg-red-500 rounded hover:bg-red-600">
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+   <!-- ✅ Add User Modal -->
+    <div x-show="openAdd" x-transition
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto"
+        x-cloak>
+        <div @click.away="openAdd = false"
+            class="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg mt-10 mb-10 overflow-y-auto max-h-[90vh]">
+            <h2 class="text-lg font-semibold mb-4">Add User</h2>
+            <form method="POST" action="{% url 'administrator_users_add_url' %}" enctype="multipart/form-data" class="space-y-3">
+                {% csrf_token %}
+
+               <div class="text-center">
+    <label class="block text-sm font-medium mb-1">Profile Picture</label>
+    <div class="flex justify-center">
+        <img id="addPreview"
+            class="mt-2 w-24 h-24 object-cover rounded-full border-2 border-gray-300 hidden" />
+    </div>
+    <input type="file" name="profile_picture" id="addProfilePicture"
+        accept="image/*"
+        class="mt-3 w-full border rounded-lg px-3 py-2"
+        onchange="previewAddImage(event)">
+    </div>  
+
+
+                <div class="grid grid-cols-1 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Email</label>
+                        <input type="email" name="email" class="w-full border rounded-lg px-3 py-2" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">First Name</label>
+                        <input type="text" name="first_name" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Middle Name</label>
+                        <input type="text" name="middle_name" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Last Name</label>
+                        <input type="text" name="last_name" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Suffix</label>
+                        <input type="text" name="suffix" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Sex</label>
+                        <select name="sex" class="w-full border rounded-lg px-3 py-2">
+                            <option value="">Select</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="n/a">N/A</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Civil Status</label>
+                        <select name="civil_status" class="w-full border rounded-lg px-3 py-2">
+                            <option value="">Select</option>
+                            <option value="single">Single</option>
+                            <option value="married">Married</option>
+                            <option value="n/a">N/A</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Contact Number</label>
+                    <input type="text" name="contact_number" class="w-full border rounded-lg px-3 py-2">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Address</label>
+                    <textarea name="address" class="w-full border rounded-lg px-3 py-2"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Password</label>
+                        <input type="password" name="password" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Confirm Password</label>
+                        <input type="password" name="confirm_password" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Role</label>
+                    <select name="role" class="w-full border rounded-lg px-3 py-2" required>
+                        <option value="admin">Administrator</option>
+                        <option value="proponent">Proponent</option>
+                        <option value="dost_staff">PSTO Staff</option>
+                        <option value="beneficiary">Beneficiary</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" @click="openAdd = false"
+                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ✅ Edit User Modal -->
+    <div x-show="openEdit" x-transition
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto"
+        x-cloak>
+        <div @click.away="openEdit = false"
+            class="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg mt-10 mb-10 overflow-y-auto max-h-[90vh]">
+            <h2 class="text-lg font-semibold mb-4">Edit User</h2>
+            <form method="POST" :action="`/administrator/users/update/${editUser.id}/`" enctype="multipart/form-data" class="space-y-3">
+                {% csrf_token %}
+
+               <div class="text-center">
+                    <label class="block text-sm font-medium mb-1">Profile Picture</label>
+                    <div class="flex justify-center">
+                        <img id="editPreview"
+                            :src="editUser.profile_picture || ''"
+                            class="mt-2 w-24 h-24 object-cover rounded-full border-2 border-gray-300"
+                            x-show="editUser.profile_picture || document.getElementById('editPreview').src">
+                    </div>
+                    <input type="file" name="profile_picture" id="editProfilePicture"
+                        accept="image/*"
+                        class="mt-3 w-full border rounded-lg px-3 py-2"
+                        onchange="previewEditImage(event)">
+                </div>
+
+
+
+                <div class="grid grid-cols-1 gap-3">
+                 
+                    <div>
+                        <label class="block text-sm font-medium">Email</label>
+                        <input type="email" name="email" x-model="editUser.email" class="w-full border rounded-lg px-3 py-2" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">First Name</label>
+                        <input type="text" name="first_name" x-model="editUser.first_name" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Middle Name</label>
+                        <input type="text" name="middle_name" x-model="editUser.middle_name" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Last Name</label>
+                    <input type="text" name="last_name" x-model="editUser.last_name" class="w-full border rounded-lg px-3 py-2">
+                </div>
+
+                <!-- Password Reset Section -->
+                <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium text-gray-700">Password Management</label>
+                        <button type="button" 
+                                @click="
+                                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+                                    let pwd = '';
+                                    for (let i = 0; i < 12; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+                                    $refs.editPassword.value = pwd;
+                                    $refs.editConfirmPassword.value = pwd;
+                                    $refs.editPassword.type = 'text';
+                                    $refs.editConfirmPassword.type = 'text';
+                                "
+                                class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
+                            Generate Password
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">New Password (optional)</label>
+                            <div class="relative">
+                                <input type="password" name="password" x-ref="editPassword"
+                                       class="w-full border rounded-lg px-3 py-2 pr-10" 
+                                       autocomplete="new-password" placeholder="Leave blank to keep current">
+                                <button type="button" 
+                                        @click="$refs.editPassword.type = $refs.editPassword.type === 'password' ? 'text' : 'password'"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                    <span class="material-icons text-sm">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Confirm Password</label>
+                            <div class="relative">
+                                <input type="password" name="confirm_password" x-ref="editConfirmPassword"
+                                       class="w-full border rounded-lg px-3 py-2 pr-10"
+                                       autocomplete="new-password" placeholder="Confirm new password">
+                                <button type="button" 
+                                        @click="$refs.editConfirmPassword.type = $refs.editConfirmPassword.type === 'password' ? 'text' : 'password'"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                    <span class="material-icons text-sm">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">
+                        <span class="material-icons text-xs align-middle">info</span>
+                        Click "Generate Password" to create a random password you can share with the user.
+                    </p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Role</label>
+                    <select name="role" x-model="editUser.role" class="w-full border rounded-lg px-3 py-2" required>
+                        <option value="admin">Administrator</option>
+                        <option value="proponent">Proponent</option>
+                        <option value="dost_staff">PSTO Staff</option>
+                        <option value="beneficiary">Beneficiary</option>
+                    </select>
+                </div>
+
+                <!-- TNA Status (for Beneficiaries) -->
+                <div x-show="editUser.role === 'beneficiary'" class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-blue-800">Technology Needs Assessment (TNA)</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-blue-700">TNA Status</label>
+                            <select name="tna_status" x-model="editUser.tna_status" class="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="not_started">TNA Not Started</option>
+                                <option value="in_progress">TNA In Progress</option>
+                                <option value="completed">TNA Completed</option>
+                                <option value="equipment_selection">Equipment Selection</option>
+                                <option value="procurement">Under Procurement</option>
+                                <option value="delivery_pending">Delivery Pending</option>
+                                <option value="delivered">Equipment Delivered</option>
+                                <option value="operational">Operational</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-blue-700">TNA Completion Date</label>
+                            <input type="date" name="tna_completion_date" x-model="editUser.tna_completion_date" class="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-blue-700">TNA Notes</label>
+                        <textarea name="tna_notes" x-model="editUser.tna_notes" rows="2" class="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm" placeholder="Notes from TNA assessment..."></textarea>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" @click="openEdit = false"
+                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ✅ Delete User Confirmation Modal -->
+    <div x-show="openDelete" x-transition
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+        x-cloak>
+        <div @click.away="openDelete = false"
+            class="bg-white w-full max-w-md p-6 rounded-lg shadow-lg">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-shrink-0 bg-red-100 rounded-full p-2">
+                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Delete User</h2>
+            </div>
+            <p class="text-gray-600 mb-4">Are you sure you want to delete user <strong x-text="deleteUser.email"></strong>? This action cannot be undone.</p>
+            <form method="POST" :action="`/administrator/users/delete/${deleteUser.id}/`">
+                {% csrf_token %}
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="openDelete = false"
+                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ✅ Mass Delete Confirmation Modal -->
+    <div x-show="openMassDelete" x-transition
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+        x-cloak>
+        <div @click.away="openMassDelete = false"
+            class="bg-white w-full max-w-md p-6 rounded-lg shadow-lg">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-shrink-0 bg-red-100 rounded-full p-2">
+                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Delete Multiple Users</h2>
+            </div>
+            <p class="text-gray-600 mb-4">Are you sure you want to delete <strong x-text="selectedIds.length"></strong> selected users? This action cannot be undone.</p>
+            <form method="POST" action="{% url 'administrator_users_mass_delete_url' %}">
+                {% csrf_token %}
+                <template x-for="id in selectedIds" :key="id">
+                    <input type="hidden" name="ids" :value="id">
+                </template>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="openMassDelete = false"
+                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete All</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+</div>
+
+<script>
+    function previewAddImage(event) {
+        const output = document.getElementById('addPreview');
+        const file = event.target.files[0];
+        if (file) {
+            output.src = URL.createObjectURL(file);
+            output.classList.remove('hidden');
+        }
+    }
+
+    function previewEditImage(event) {
+        const output = document.getElementById('editPreview');
+        const file = event.target.files[0];
+        if (file) {
+            output.src = URL.createObjectURL(file);
+            output.classList.remove('hidden');
+        }
+    }
+</script>
+
+
+<script>
+    $(document).ready(function () {
+        $('#usersTable').DataTable();
+    });
+</script>
+{% endblock %}

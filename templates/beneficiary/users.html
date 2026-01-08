@@ -1,0 +1,92 @@
+{% extends "beneficiary/base.html" %}
+{% load static %}
+
+{% block title %}User Management{% endblock %}
+{% block nav-users %}active-nav{% endblock %}
+{% block page-title %}User Management{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<div class="container mt-2" x-data="{ openAdd: false, openEdit: false, editUser: {} }">
+
+    <!-- ✅ Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white 
+                        {% if message.tags == 'success' %} bg-green-500 
+                        {% elif message.tags == 'error' %} bg-red-500 
+                        {% else %} bg-blue-500 {% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+
+    <!-- ✅ Users Table -->
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg p-4">
+        <table id="usersTable" class="min-w-full text-sm text-left text-gray-600">
+            <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Username</th>
+                    <th class="px-4 py-2">Full Name</th>
+                    <th class="px-4 py-2">Email</th>
+                    <th class="px-4 py-2">Role</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2">{{ user.username }}</td>
+                    <td class="px-4 py-2">{{ user.full_name }}</td>
+                    <td class="px-4 py-2">{{ user.email }}</td>
+                    <td class="px-4 py-2">{{ user.get_role_display }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+
+</div>
+
+
+<script>
+    $(document).ready(function () {
+        $('#usersTable').DataTable();
+
+        document.querySelectorAll('.editBtn').forEach(button => {
+            button.addEventListener('click', function () {
+                const root = document.querySelector('[x-data]');
+                const alpine = Alpine.$data(root);
+
+                // Get dataset properly
+                const profilePic = this.dataset.profile_picture;
+
+                // Fill Alpine editUser object
+                alpine.editUser = {
+                    id: this.dataset.id,
+                    username: this.dataset.username,
+                    first_name: this.dataset.first_name,
+                    middle_name: this.dataset.middle_name,
+                    last_name: this.dataset.last_name,
+                    email: this.dataset.email,
+                    role: this.dataset.role,
+                    profile_picture: profilePic
+                };
+
+                // Update preview manually
+                document.getElementById('editPreview').src = profilePic || "";
+
+                // Open modal
+                alpine.openEdit = true;
+            });
+        });
+    });
+</script>
+{% endblock %}

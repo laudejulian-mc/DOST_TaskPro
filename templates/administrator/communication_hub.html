@@ -1,0 +1,226 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Communication Hub - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <h1 class="text-3xl font-bold text-gray-900">Communication Hub</h1>
+                <p class="mt-1 text-sm text-gray-500">Manage messages, group chats, and announcements</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Flash Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 p-3 rounded-lg text-white 
+                            {% if message.tags == 'success' %} bg-green-500 
+                            {% elif message.tags == 'error' %} bg-red-500 
+                            {% else %} bg-blue-500 {% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Quick Actions -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-sm border p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                    <div class="space-y-3">
+                        <a href="{% url 'administrator_compose_message_url' %}"
+                           class="flex items-center w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200">
+                            <span class="material-icons text-sm mr-2">send</span>
+                            Compose Message
+                        </a>
+                        <a href="{% url 'administrator_create_group_chat_url' %}"
+                           class="flex items-center w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200">
+                            <span class="material-icons text-sm mr-2">group_add</span>
+                            Create Group Chat
+                        </a>
+                        {% if user.role == 'admin' %}
+                        <a href="{% url 'administrator_create_announcement_url' %}"
+                           class="flex items-center w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200">
+                            <span class="material-icons text-sm mr-2">campaign</span>
+                            Create Announcement
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Recent Announcements -->
+                <div class="bg-white rounded-lg shadow-sm border p-6 mt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Announcements</h3>
+                    <div class="space-y-3">
+                        {% for announcement in recent_announcements %}
+                        <div class="border-l-4 {% if announcement.priority == 'urgent' %}border-red-500{% elif announcement.priority == 'high' %}border-orange-500{% elif announcement.priority == 'normal' %}border-blue-500{% else %}border-gray-500{% endif %} pl-4">
+                            <h4 class="font-medium text-gray-900">{{ announcement.title }}</h4>
+                            <p class="text-sm text-gray-600 mt-1">{{ announcement.content|truncatechars:100 }}</p>
+                            <p class="text-xs text-gray-500 mt-1">{{ announcement.created_at|date:"M d, Y H:i" }}</p>
+                        </div>
+                        {% empty %}
+                        <p class="text-gray-500 text-sm">No recent announcements</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Messages Card -->
+                <a href="{% url 'administrator_messages_url' %}" class="block">
+                    <div class="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition duration-200 cursor-pointer">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                                    <span class="material-icons text-blue-600">mail</span>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-semibold text-gray-900">Messages</h2>
+                                    <p class="text-sm text-gray-500">Direct messages and conversations</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                {% if unread_messages > 0 %}
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                                    {{ unread_messages }} unread
+                                </span>
+                                {% else %}
+                                <span class="text-blue-600 hover:text-blue-800 text-sm font-medium">View Messages →</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                            {% if recent_messages %}
+                            {% for message in recent_messages|slice:":3" %}
+                            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+                                        <span class="text-xs text-gray-600 font-medium">
+                                            {{ message.sender.first_name|first|upper }}{{ message.sender.last_name|first|upper }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900">
+                                            {% if message.sender == user %}
+                                                To: {{ message.recipient.get_full_name }}
+                                            {% else %}
+                                                From: {{ message.sender.get_full_name }}
+                                            {% endif %}
+                                        </p>
+                                        <p class="text-xs text-gray-600">{{ message.subject|truncatechars:40 }}</p>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    {{ message.created_at|date:"M d" }}
+                                    {% if message.recipient == user and not message.is_read %}
+                                    <span class="inline-block w-2 h-2 bg-blue-500 rounded-full ml-1"></span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
+                            <p class="text-gray-500 text-sm">No messages yet</p>
+                            {% endif %}
+                    </div>
+                </a>
+
+                <!-- Group Chats Card -->
+                <a href="{% url 'administrator_group_chats_url' %}" class="block">
+                    <div class="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition duration-200 cursor-pointer">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                                    <span class="material-icons text-green-600">group</span>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-semibold text-gray-900">Group Chats</h2>
+                                    <p class="text-sm text-gray-500">Team discussions and project collaboration</p>
+                                </div>
+                            </div>
+                            <span class="text-green-600 hover:text-green-800 text-sm font-medium">View Group Chats →</span>
+                        </div>
+                        {% if user_group_chats %}
+                        <div class="space-y-2">
+                            {% for chat_member in user_group_chats|slice:":3" %}
+                            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+                                        <span class="material-icons text-sm text-gray-600">group</span>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-sm font-medium text-gray-900">{{ chat_member.group_chat.name }}</h3>
+                                        {% if chat_member.group_chat.project %}
+                                        <p class="text-xs text-gray-600">{{ chat_member.group_chat.project.project_title|truncatechars:30 }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    {{ chat_member.group_chat.updated_at|date:"M d" }}
+                                    {% if chat_member.role == 'admin' %}
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 ml-1">
+                                        Admin
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-gray-500 text-sm">No group chats yet</p>
+                        {% endif %}
+                    </div>
+                </a>
+
+                <!-- Announcements Card -->
+                {% if user.role == 'admin' %}
+                <a href="{% url 'administrator_announcements_url' %}" class="block">
+                    <div class="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition duration-200 cursor-pointer">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                                    <span class="material-icons text-purple-600">campaign</span>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-semibold text-gray-900">Announcements</h2>
+                                    <p class="text-sm text-gray-500">Official announcements and updates</p>
+                                </div>
+                            </div>
+                            <span class="text-purple-600 hover:text-purple-800 text-sm font-medium">View Announcements →</span>
+                        </div>
+                        {% if recent_announcements %}
+                        <div class="space-y-2">
+                            {% for announcement in recent_announcements|slice:":3" %}
+                            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 {% if announcement.priority == 'urgent' %}bg-red-100{% elif announcement.priority == 'high' %}bg-orange-100{% elif announcement.priority == 'normal' %}bg-blue-100{% else %}bg-gray-100{% endif %} rounded-full flex items-center justify-center mr-3">
+                                        <span class="material-icons text-xs {% if announcement.priority == 'urgent' %}text-red-600{% elif announcement.priority == 'high' %}text-orange-600{% elif announcement.priority == 'normal' %}text-blue-600{% else %}text-gray-600{% endif %}">
+                                            {% if announcement.priority == 'urgent' %}error{% elif announcement.priority == 'high' %}warning{% else %}info{% endif %}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-sm font-medium text-gray-900">{{ announcement.title|truncatechars:40 }}</h3>
+                                        <p class="text-xs text-gray-600">{{ announcement.content|truncatechars:50 }}</p>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    {{ announcement.created_at|date:"M d" }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-gray-500 text-sm">No announcements yet</p>
+                        {% endif %}
+                    </div>
+                </a>
+                {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

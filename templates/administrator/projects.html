@@ -1,0 +1,1932 @@
+{% extends "administrator/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Projects{% endblock %}
+{% block nav-projects %}active-nav{% endblock %}
+{% block page-title %}Projects{% endblock %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Leaflet CSS/JS for mini maps -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+
+<!-- Budget data for Alpine.js -->
+<script>
+    window.availableBudgetsData = {{ budgets_json|safe }};
+</script>
+
+<!-- 
+    LAYOUT FIX: Main container with proper width handling
+    Use w-full min-w-0 to prevent overflow issues with wide tables
+-->
+<div class="w-full min-w-0" x-data="{ 
+    openAdd: false, 
+    openEdit: false,
+    openView: false,
+    openDelete: false,
+    openMassDelete: false,
+    openEquipmentDelivery: false,
+    editProject: {}, 
+    viewProject: {},
+    deleteProject: {},
+    equipmentDelivery: {
+        project_id: '',
+        project_title: '',
+        equipment_name: '',
+        quantity: 1,
+        property_tag_number: '',
+        serial_numbers: '',
+        delivery_date: new Date().toISOString().split('T')[0],
+        received_by: '',
+        condition_notes: ''
+    },
+    activeTab: 'identification',
+    editData: {},
+    selectedIds: [],
+    selectAll: false,
+    addMap: null,
+    addMarker: null,
+    editMap: null,
+    editMarker: null,
+    availableBudgets: window.availableBudgetsData || [],
+    selectedBudgetId: '',
+    selectedFundSource: '',
+    municipalityCoords: {
+        'Almeria': {lat: 11.6167, lng: 124.4333},
+        'Biliran': {lat: 11.5833, lng: 124.4667},
+        'Cabucgayan': {lat: 11.4667, lng: 124.5500},
+        'Caibiran': {lat: 11.5500, lng: 124.5833},
+        'Culaba': {lat: 11.6500, lng: 124.5500},
+        'Kawayan': {lat: 11.6667, lng: 124.5000},
+        'Maripipi': {lat: 11.7833, lng: 124.3333},
+        'Naval': {lat: 11.5667, lng: 124.4000}
+    },
+    updateFundSource() {
+        const budget = this.availableBudgets.find(b => b.id == this.selectedBudgetId);
+        if (budget) {
+            this.selectedFundSource = budget.fund_source;
+        } else {
+            this.selectedFundSource = '';
+        }
+    },
+    getSelectedBudgetRemaining() {
+        const budget = this.availableBudgets.find(b => b.id == this.selectedBudgetId);
+        return budget ? budget.remaining_amount : 0;
+    },
+    toggleSelectAll() {
+        if (this.selectAll) {
+            this.selectedIds = [...document.querySelectorAll('.project-checkbox')].map(cb => cb.value);
+        } else {
+            this.selectedIds = [];
+        }
+    },
+    updateSelectAll() {
+        const allCheckboxes = document.querySelectorAll('.project-checkbox');
+        this.selectAll = this.selectedIds.length === allCheckboxes.length && allCheckboxes.length > 0;
+    },
+    initAddMap() {
+        if (this.addMap) return; // Already initialized
+        const mapContainer = document.getElementById('addProjectMap');
+        if (!mapContainer) return;
+        
+        const defaultLat = 11.55;
+        const defaultLng = 124.47;
+        
+        this.addMap = L.map('addProjectMap').setView([defaultLat, defaultLng], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(this.addMap);
+        
+        this.addMarker = L.marker([defaultLat, defaultLng], {draggable: true}).addTo(this.addMap);
+        
+        // Update coordinates when marker is dragged
+        this.addMarker.on('dragend', (e) => {
+            const pos = e.target.getLatLng();
+            this.prefillData.latitude = pos.lat.toFixed(6);
+            this.prefillData.longitude = pos.lng.toFixed(6);
+        });
+        
+        // Click on map to move marker
+        this.addMap.on('click', (e) => {
+            this.addMarker.setLatLng(e.latlng);
+            this.prefillData.latitude = e.latlng.lat.toFixed(6);
+            this.prefillData.longitude = e.latlng.lng.toFixed(6);
+        });
+        
+        // Set initial coordinates
+        this.prefillData.latitude = defaultLat.toFixed(6);
+        this.prefillData.longitude = defaultLng.toFixed(6);
+    },
+    updateMapFromMunicipality(mun, mapType) {
+        const coords = this.municipalityCoords[mun];
+        if (!coords) return;
+        
+        if (mapType === 'add' && this.addMap && this.addMarker) {
+            this.addMap.setView([coords.lat, coords.lng], 12);
+            this.addMarker.setLatLng([coords.lat, coords.lng]);
+            this.prefillData.latitude = coords.lat.toFixed(6);
+            this.prefillData.longitude = coords.lng.toFixed(6);
+        }
+    },
+    centerAddMap() {
+        if (this.addMap) {
+            this.addMap.setView([11.55, 124.47], 10);
+            this.addMarker.setLatLng([11.55, 124.47]);
+            this.prefillData.latitude = '11.550000';
+            this.prefillData.longitude = '124.470000';
+        }
+    },
+    init() {
+        // Check URL params for pre-filling from proposal
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('from_proposal')) {
+            this.prefillData = {
+                title: urlParams.get('title') || '',
+                description: urlParams.get('description') || '',
+                beneficiaries: urlParams.get('beneficiaries') || '',
+                proponent: urlParams.get('proponent') || '',
+                municipality: urlParams.get('municipality') || '',
+                province: urlParams.get('province') || 'Biliran',
+                location: urlParams.get('location') || '',
+                amount: urlParams.get('amount') || '',
+                proposal_id: urlParams.get('from_proposal') || '',
+                latitude: '',
+                longitude: ''
+            };
+            this.openAdd = true;
+            this.activeTab = 'basic';
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
+        // Watch for openAdd to initialize map
+        this.$watch('openAdd', (value) => {
+            if (value) {
+                setTimeout(() => {
+                    this.initAddMap();
+                    if (this.addMap) this.addMap.invalidateSize();
+                }, 100);
+            }
+        });
+        
+        // Watch for activeTab to resize map when Location tab is shown
+        this.$watch('activeTab', (value) => {
+            if (value === 'location' && this.addMap) {
+                setTimeout(() => this.addMap.invalidateSize(), 100);
+            }
+        });
+    },
+    prefillData: {latitude: '', longitude: ''}
+}" x-init="init()">
+
+    <!-- Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white {% if message.tags == 'success' %}bg-green-500{% elif message.tags == 'error' %}bg-red-500{% else %}bg-blue-500{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Actions Bar -->
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-2">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                Project Database
+                <span class="tooltip-container ml-2">
+                    <span class="tooltip-icon">?</span>
+                    <span class="tooltip-text">Manage all approved projects in the system. View project details, track progress, update information, and monitor project locations on the map. Projects are created from approved proposals.</span>
+                </span>
+            </h2>
+            <!-- Mass Delete Button (shown when items selected) -->
+            <template x-if="selectedIds.length > 0">
+                <button @click="openMassDelete = true"
+                    class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 ml-4">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete Selected (<span x-text="selectedIds.length"></span>)
+                </button>
+            </template>
+        </div>
+        <button @click="openAdd = true; activeTab = 'identification'" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2">
+            <span class="material-icons text-sm">add</span> Add Project
+        </button>
+    </div>
+
+    <!-- 1. PROJECTS TABLE (Top) -->
+    <div class="bg-white shadow-md rounded-lg p-4 mb-8 w-full overflow-hidden">
+        <div class="overflow-x-auto w-full">
+            <table id="projectsTable" class="min-w-full text-xs text-left text-gray-600 whitespace-nowrap">
+                <thead class="bg-gray-100 text-gray-700 uppercase font-semibold text-xs tracking-wider">
+                    <tr>
+                        <!-- Checkbox -->
+                        <th class="px-2 py-3 border-b w-10">
+                            <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" 
+                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        </th>
+                        <!-- Actions -->
+                        <th class="px-4 py-3 border-b text-center">Actions</th>
+                        <!-- Identification -->
+                        <th class="px-4 py-3 border-b">No.</th>
+                        <th class="px-4 py-3 border-b">Code</th>
+                        <th class="px-4 py-3 border-b">Year</th>
+                        
+                        <!-- Basic Info -->
+                        <th class="px-4 py-3 border-b">Project Title</th>
+                        <th class="px-4 py-3 border-b">Agency</th>
+                        <th class="px-4 py-3 border-b">Program</th>
+                        <th class="px-4 py-3 border-b">Type</th>
+                        <th class="px-4 py-3 border-b">Status</th>
+                        <th class="px-4 py-3 border-b">Remarks</th>
+                        
+                        <!-- Location -->
+                        <th class="px-4 py-3 border-b">Municipality</th>
+                        <th class="px-4 py-3 border-b">Province</th>
+                        <th class="px-4 py-3 border-b">District</th>
+                        
+                        <!-- Beneficiaries -->
+                        <th class="px-4 py-3 border-b">Beneficiary</th>
+                        <th class="px-4 py-3 border-b">Beneficiary Address</th>
+                        <th class="px-4 py-3 border-b">Contact</th>
+                        <th class="px-4 py-3 border-b">Proponent</th>
+                        <th class="px-4 py-3 border-b">No. Beneficiaries</th>
+                        <th class="px-4 py-3 border-b">Male</th>
+                        <th class="px-4 py-3 border-b">Female</th>
+                        <th class="px-4 py-3 border-b">Total</th>
+                        <th class="px-4 py-3 border-b">Senior</th>
+                        <th class="px-4 py-3 border-b">PWD</th>
+                        
+                        <!-- Financials -->
+                        <th class="px-4 py-3 border-b">Fund Source</th>
+                        <th class="px-4 py-3 border-b text-right">Approved Budget</th>
+                        <th class="px-4 py-3 border-b text-right">Total Cost</th>
+                        <th class="px-4 py-3 border-b text-right">Counterpart</th>
+                        <th class="px-4 py-3 border-b text-right">Internal Fund</th>
+                        <th class="px-4 py-3 border-b text-right">Released</th>
+                        
+                        <!-- Tranches -->
+                        <th class="px-4 py-3 border-b text-right">1st Tranche</th>
+                        <th class="px-4 py-3 border-b text-right">2nd Tranche</th>
+                        <th class="px-4 py-3 border-b text-right">3rd Tranche</th>
+                        
+                        <!-- Dates & Timeline -->
+                        <th class="px-4 py-3 border-b">Start Date</th>
+                        <th class="px-4 py-3 border-b">End Date</th>
+                        <th class="px-4 py-3 border-b">Release Date</th>
+                        <th class="px-4 py-3 border-b">Completion Date</th>
+                        <th class="px-4 py-3 border-b">Duration</th>
+                        <th class="px-4 py-3 border-b">Extension Date</th>
+                        
+                        <!-- Liquidation -->
+                        <th class="px-4 py-3 border-b">Check/ADA</th>
+                        <th class="px-4 py-3 border-b">Liq. Status</th>
+                        <th class="px-4 py-3 border-b">Liq. Date</th>
+                        <th class="px-4 py-3 border-b text-right">Amount Liq.</th>
+                        
+                        <!-- Tech & Interventions -->
+                        <th class="px-4 py-3 border-b">Tech Availed</th>
+                        <th class="px-4 py-3 border-b">Interventions</th>
+                        
+                        <!-- Documents & Status -->
+                        <th class="px-4 py-3 border-b">TAFR</th>
+                        <th class="px-4 py-3 border-b">PAR</th>
+                        <th class="px-4 py-3 border-b">Terminal Report</th>
+                        <th class="px-4 py-3 border-b">Invoice/Receipt</th>
+                        <th class="px-4 py-3 border-b">Equipment List</th>
+                        
+                        <!-- Donation -->
+                        <th class="px-4 py-3 border-b">Donated</th>
+                        <th class="px-4 py-3 border-b">Donation Date</th>
+                        <th class="px-4 py-3 border-b">Donation Status</th>
+                        
+                        <!-- Other -->
+                        <th class="px-4 py-3 border-b">PME Visit</th>
+                        <th class="px-4 py-3 border-b">Women Group</th>
+                        <th class="px-4 py-3 border-b">Inspection Date</th>
+                        <th class="px-4 py-3 border-b">Receipt by Grantee</th>
+                        <th class="px-4 py-3 border-b">Photo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for project in projects %}
+                    <tr class="hover:bg-blue-50 transition cursor-pointer" 
+                        onclick="if (!event.target.closest('input, button, a')) { window.location.href='{% url 'administrator_projects_detail_url' project.pk %}'; }">
+                        <!-- Checkbox -->
+                        <td class="px-2 py-3" onclick="event.stopPropagation();">
+                            <input type="checkbox" class="project-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                value="{{ project.id }}"
+                                x-model="selectedIds"
+                                @change="updateSelectAll()">
+                        </td>
+                        <!-- Actions -->
+                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation();">
+                            <button type="button" class="text-blue-500 hover:text-blue-700 viewBtn mr-2"
+                                data-project-id="{{ project.id }}"
+                                title="View Details"
+                                @click="
+                                    const projectId = $el.getAttribute('data-project-id');
+                                    const allData = JSON.parse(document.getElementById('projects-data').textContent);
+                                    viewProject = allData.editData[projectId] || {};
+                                    openView = true;
+                                ">
+                                <span class="material-icons text-lg">info</span>
+                            </button>
+                            <button type="button" class="text-amber-500 hover:text-amber-700 editBtn"
+                                data-project-id="{{ project.id }}"
+                                title="Edit Project"
+                                @click="
+                                    const projectId = $el.getAttribute('data-project-id');
+                                    window.location.href = '/projects/' + projectId + '/';
+                                ">
+                                <span class="material-icons text-lg">edit</span>
+                            </button>
+                            <button type="button" class="text-red-500 hover:text-red-700 deleteBtn"
+                                data-project-id="{{ project.id }}"
+                                data-project-title="{{ project.project_title }}"
+                                title="Delete Project"
+                                @click="
+                                    deleteProject = {
+                                        id: $el.getAttribute('data-project-id'),
+                                        title: $el.getAttribute('data-project-title')
+                                    };
+                                    openDelete = true;
+                                ">
+                                <span class="material-icons text-lg">delete</span>
+                            </button>
+                            <button type="button" class="text-green-500 hover:text-green-700 equipmentBtn ml-1"
+                                data-project-id="{{ project.id }}"
+                                data-project-title="{{ project.project_title }}"
+                                title="Record Equipment Delivery (DOST)"
+                                @click="
+                                    equipmentDelivery.project_id = $el.getAttribute('data-project-id');
+                                    equipmentDelivery.project_title = $el.getAttribute('data-project-title');
+                                    equipmentDelivery.equipment_name = '';
+                                    equipmentDelivery.quantity = 1;
+                                    equipmentDelivery.property_tag_number = '';
+                                    equipmentDelivery.serial_numbers = '';
+                                    equipmentDelivery.delivery_date = new Date().toISOString().split('T')[0];
+                                    equipmentDelivery.received_by = '';
+                                    equipmentDelivery.condition_notes = '';
+                                    openEquipmentDelivery = true;
+                                ">
+                                <span class="material-icons text-lg">inventory_2</span>
+                            </button>
+                        </td>
+                        <!-- Identification -->
+                        <td class="px-4 py-3">{{ project.no|default:"-" }}</td>
+                        <td class="px-4 py-3 font-mono text-blue-600">{{ project.project_code|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.year|default:"-" }}</td>
+                        
+                        <!-- Basic Info -->
+                        <td class="px-4 py-3 font-medium text-blue-600" title="{{ project.project_title }}">
+                            {{ project.project_title|truncatechars:40|default:"-" }}
+                        </td>
+                        <td class="px-4 py-3">{{ project.agency_grantee|truncatechars:20|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.program|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.type_of_project|truncatechars:15|default:"-" }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase
+                                {% if project.status == 'Completed' %}bg-green-100 text-green-700
+                                {% elif project.status == 'Ongoing' %}bg-blue-100 text-blue-700
+                                {% elif project.status == 'Terminated' %}bg-red-100 text-red-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ project.status|default:"Pending" }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.remarks|truncatechars:15|default:"-" }}</td>
+                        
+                        <!-- Location -->
+                        <td class="px-4 py-3">{{ project.mun|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.province|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.district|default:"-" }}</td>
+                        
+                        <!-- Beneficiaries -->
+                        <td class="px-4 py-3 text-[10px]">{{ project.beneficiary|truncatechars:20|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.beneficiary_address|truncatechars:15|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.contact_details|truncatechars:15|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.proponent_details|truncatechars:15|default:"-" }}</td>
+                        <td class="px-4 py-3 text-right">{{ project.no_of_beneficiaries|default:"-" }}</td>
+                        <td class="px-4 py-3 text-right">{{ project.male|default:"0" }}</td>
+                        <td class="px-4 py-3 text-right">{{ project.female|default:"0" }}</td>
+                        <td class="px-4 py-3 text-right">{{ project.total_beneficiaries|default:"0" }}</td>
+                        <td class="px-4 py-3 text-right">{{ project.senior_citizen|default:"0" }}</td>
+                        <td class="px-4 py-3 text-right">{{ project.pwd|default:"0" }}</td>
+                        
+                        <!-- Financials -->
+                        <td class="px-4 py-3">{{ project.fund_source|default:"-" }}</td>
+                        <td class="px-4 py-3 text-right font-mono">₱{{ project.funds|floatformat:2|intcomma|default:"0.00" }}</td>
+                        <td class="px-4 py-3 text-right font-mono">₱{{ project.total_project_cost|floatformat:2|intcomma|default:"0.00" }}</td>
+                        <td class="px-4 py-3 text-right font-mono">₱{{ project.counterpart_funds|floatformat:2|intcomma|default:"0.00" }}</td>
+                        <td class="px-4 py-3 text-right font-mono">₱{{ project.internally_managed_fund|floatformat:2|intcomma|default:"0.00" }}</td>
+                        <td class="px-4 py-3 text-right font-mono text-blue-600">₱{{ project.total_funds_released|floatformat:2|intcomma|default:"0.00" }}</td>
+                        
+                        <!-- Tranches -->
+                        <td class="px-4 py-3 text-right font-mono">₱{{ project.first_tranche|floatformat:2|intcomma|default:"0.00" }}</td>
+                        <td class="px-4 py-3 text-right font-mono">₱{{ project.second_tranche|floatformat:2|intcomma|default:"0.00" }}</td>
+                        <td class="px-4 py-3 text-right font-mono">₱{{ project.third_tranche|floatformat:2|intcomma|default:"0.00" }}</td>
+                        
+                        <!-- Dates & Timeline -->
+                        <td class="px-4 py-3">{{ project.project_start|date:"M d, Y"|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.project_end|date:"M d, Y"|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.date_of_release|date:"M d, Y"|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.date_of_completion|date:"M d, Y"|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.original_project_duration|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.extension_date|default:"-" }}</td>
+                        
+                        <!-- Liquidation -->
+                        <td class="px-4 py-3">{{ project.check_ada_no|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.status_of_liquidation|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.date_of_liquidation|date:"M d, Y"|default:"-" }}</td>
+                        <td class="px-4 py-3 text-right font-mono text-green-600">₱{{ project.amount_liquidated|floatformat:0|intcomma|default:"0" }}</td>
+                        
+                        <!-- Tech & Interventions -->
+                        <td class="px-4 py-3 text-[10px]">{{ project.availed_technologies|truncatechars:15|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.interventions|truncatechars:15|default:"-" }}</td>
+                        
+                        <!-- Documents & Status -->
+                        <td class="px-4 py-3">{{ project.tafr|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.par|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.terminal_report|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.invoice_receipt|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.list_of_eqpt|truncatechars:15|default:"-" }}</td>
+                        
+                        <!-- Donation -->
+                        <td class="px-4 py-3">{{ project.donated|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.date_of_donation|date:"M d, Y"|default:"-" }}</td>
+                        <td class="px-4 py-3 text-[10px]">{{ project.donation_status|truncatechars:15|default:"-" }}</td>
+                        
+                        <!-- Other -->
+                        <td class="px-4 py-3">{{ project.pme_visit|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.womens_group|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.date_of_inspection_tagging|date:"M d, Y"|default:"-" }}</td>
+                        <td class="px-4 py-3">{{ project.acknowledgment_receipt_by_grantee|default:"-" }}</td>
+                        <td class="px-4 py-3">
+                            {% if project.product_photo %}
+                                <a href="{{ project.product_photo.url }}" target="_blank" class="text-blue-600 underline text-[10px]">View</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================== -->
+    <!-- 2. DATA VISUALIZATIONS (Bottom) -->
+    <!-- =========================== -->
+    <!-- CHARTS ROW 1 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+        <!-- Chart 1: Top Projects by Funding -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="material-icons text-emerald-500 text-base">trending_up</span>
+                Top 10 Projects by Funding
+            </h3>
+            <div class="relative h-48 w-full">
+                <canvas id="financialChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 2: Beneficiary Demographics -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="material-icons text-blue-500 text-base">people</span>
+                Beneficiary Demographics
+            </h3>
+            <div class="relative h-48 w-full">
+                <canvas id="demographicsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS ROW 2 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+        <!-- Chart 3: Status Distribution -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="material-icons text-indigo-500 text-base">pie_chart</span>
+                Project Status Distribution
+            </h3>
+            <div class="relative h-48 w-full">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 4: Projects by Program -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="material-icons text-purple-500 text-base">bar_chart</span>
+                Projects by Program
+            </h3>
+            <div class="relative h-48 w-full">
+                <canvas id="programChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS ROW 3 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+        <!-- Chart 5: Projects by Fund Source -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="material-icons text-orange-500 text-base">account_balance</span>
+                Projects by Fund Source
+            </h3>
+            <div class="relative h-48 w-full">
+                <canvas id="fundSourceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 6: Projects by Municipality -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="material-icons text-teal-500 text-base">location_on</span>
+                Top Municipalities
+            </h3>
+            <div class="relative h-48 w-full">
+                <canvas id="municipalityChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS ROW 4 -->
+    <div class="grid grid-cols-1 gap-4 mb-6">
+        <!-- Chart 7: Projects by Year -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="material-icons text-red-500 text-base">trending_up</span>
+                Projects by Year
+            </h3>
+            <div class="relative h-48 w-full">
+                <canvas id="yearChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================== -->
+    <!-- ADD PROJECT MODAL           -->
+    <!-- =========================== -->
+    <div x-show="openAdd" 
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 py-8" 
+        x-cloak
+        @click="openAdd = false"
+        style="display: none;">
+        <div @click.stop class="bg-white w-full max-w-6xl h-[90vh] rounded-lg shadow-lg flex flex-col">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                <h2 class="text-xl font-bold text-gray-800">Add New Project</h2>
+                <button @click="openAdd = false" class="text-gray-500 hover:text-red-500"><span class="material-icons">close</span></button>
+            </div>
+
+            <form method="POST" action="{% url 'administrator_projects_add_url' %}" enctype="multipart/form-data" class="flex flex-col flex-grow overflow-hidden">
+                {% csrf_token %}
+                <input type="hidden" name="proposal" x-model="prefillData.proposal_id">
+                
+                <!-- Tabs -->
+                <div class="flex border-b bg-gray-100 px-6 space-x-1 overflow-x-auto">
+                    <template x-for="tab in ['identification', 'basic', 'location', 'beneficiaries', 'financials', 'tranches', 'liquidation', 'timeline', 'checklist']">
+                        <button type="button" @click="activeTab = tab" 
+                            :class="activeTab === tab ? 'bg-white border-t-2 border-blue-600 text-blue-700' : 'text-gray-600 hover:bg-gray-200'"
+                            class="px-4 py-2 text-sm font-medium capitalize focus:outline-none rounded-t-md transition">
+                            <span x-text="tab"></span>
+                        </button>
+                    </template>
+                </div>
+
+                <!-- Scrollable Content -->
+                <div class="flex-grow overflow-y-auto p-6 bg-white">
+                    
+                    <!-- 1. Identification -->
+                    <div x-show="activeTab === 'identification'" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div><label class="text-xs font-bold text-gray-600">No.</label><input type="number" name="no" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Project Code</label><input type="text" name="project_code" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Year</label><input type="number" name="year" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Status</label>
+                            <select name="status" class="w-full border rounded p-2 text-sm">
+                                <option value="New">New</option>
+                                <option value="Ongoing">Ongoing</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Terminated">Terminated</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 2. Basic Info -->
+                    <div x-show="activeTab === 'basic'" class="space-y-4">
+                        <div><label class="text-xs font-bold text-gray-600">Project Title</label><textarea name="project_title" x-model="prefillData.title" rows="2" class="w-full border rounded p-2 text-sm" required></textarea></div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Agency/Grantee</label><input type="text" name="agency_grantee" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Program</label><input type="text" name="program" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Type of Project</label><input type="text" name="type_of_project" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Remarks</label><textarea name="remarks" x-model="prefillData.description" rows="1" class="w-full border rounded p-2 text-sm"></textarea></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Tech Availed</label><textarea name="availed_technologies" rows="2" class="w-full border rounded p-2 text-sm"></textarea></div>
+                            <div><label class="text-xs font-bold text-gray-600">Interventions</label><textarea name="interventions" rows="2" class="w-full border rounded p-2 text-sm"></textarea></div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Location -->
+                    <div x-show="activeTab === 'location'" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">Municipality</label>
+                                <select name="mun" x-model="prefillData.municipality" @change="updateMapFromMunicipality($event.target.value, 'add')" class="w-full border rounded p-2 text-sm">
+                                    <option value="">Select Municipality</option>
+                                    <option value="Almeria">Almeria</option>
+                                    <option value="Biliran">Biliran</option>
+                                    <option value="Cabucgayan">Cabucgayan</option>
+                                    <option value="Caibiran">Caibiran</option>
+                                    <option value="Culaba">Culaba</option>
+                                    <option value="Kawayan">Kawayan</option>
+                                    <option value="Maripipi">Maripipi</option>
+                                    <option value="Naval">Naval</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">Province</label>
+                                <input type="text" name="province" x-bind:value="prefillData.province || 'Biliran'" readonly class="w-full border rounded p-2 bg-gray-100 text-sm cursor-not-allowed">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">District</label>
+                                <input type="text" name="district" value="Lone District" readonly class="w-full border rounded p-2 bg-gray-100 text-sm cursor-not-allowed">
+                            </div>
+                        </div>
+                        
+                        <!-- Mini Map for Pin Location -->
+                        <div class="border rounded-lg overflow-hidden">
+                            <div class="bg-gray-100 px-3 py-2 border-b flex justify-between items-center">
+                                <span class="text-xs font-bold text-gray-600">📍 Pin Project Location (Click or drag marker)</span>
+                                <button type="button" @click="centerAddMap()" class="text-xs text-blue-600 hover:text-blue-800">Reset to Center</button>
+                            </div>
+                            <div id="addProjectMap" style="height: 250px; width: 100%;"></div>
+                        </div>
+                        
+                        <!-- Hidden inputs for coordinates -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">Latitude</label>
+                                <input type="text" name="latitude" id="addLatitude" x-model="prefillData.latitude" readonly class="w-full border rounded p-2 bg-gray-50 text-sm text-gray-600">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">Longitude</label>
+                                <input type="text" name="longitude" id="addLongitude" x-model="prefillData.longitude" readonly class="w-full border rounded p-2 bg-gray-50 text-sm text-gray-600">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Beneficiaries -->
+                    <div x-show="activeTab === 'beneficiaries'" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Beneficiary Name</label><input type="text" name="beneficiary" x-model="prefillData.beneficiaries" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Address</label><input type="text" name="beneficiary_address" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Contact Details</label><input type="text" name="contact_details" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Proponent Details</label><input type="text" name="proponent_details" x-model="prefillData.proponent" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <h4 class="text-sm font-bold border-b pb-1 mt-2 text-blue-600">Demographics</h4>
+                        <div class="grid grid-cols-5 gap-2">
+                            <div><label class="text-xs text-gray-600">Male</label><input type="number" name="male" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Female</label><input type="number" name="female" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Total</label><input type="number" name="total_beneficiaries" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Senior</label><input type="number" name="senior_citizen" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">PWD</label><input type="number" name="pwd" class="w-full border rounded p-1 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Financials -->
+                    <div x-show="activeTab === 'financials'" class="space-y-4">
+                        <!-- Budget Selection with Available Funds -->
+                        <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                            <label class="text-xs font-bold text-blue-700 block mb-2">Select Budget Source</label>
+                            <select name="budget_id" x-model="selectedBudgetId" @change="updateFundSource()" 
+                                    class="w-full border border-blue-300 rounded p-2 text-sm bg-white">
+                                <option value="">-- Select Budget --</option>
+                                <template x-for="budget in availableBudgets" :key="budget.id">
+                                    <option :value="budget.id" 
+                                            x-text="budget.fund_source + ' (' + budget.fiscal_year + ') - Available: ₱' + budget.remaining_amount.toLocaleString()">
+                                    </option>
+                                </template>
+                            </select>
+                            <p class="text-xs text-blue-600 mt-1" x-show="selectedBudgetId">
+                                Available: <span class="font-bold" x-text="'₱' + getSelectedBudgetRemaining().toLocaleString()"></span>
+                            </p>
+                        </div>
+                        <!-- Hidden field to store fund_source text -->
+                        <input type="hidden" name="fund_source" x-model="selectedFundSource">
+                        
+                        <div class="grid grid-cols-3 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Approved Funds</label><input type="number" step="0.01" name="funds" x-model="prefillData.amount" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Total Project Cost</label><input type="number" step="0.01" name="total_project_cost" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Counterpart Funds</label><input type="number" step="0.01" name="counterpart_funds" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Internal Fund</label><input type="number" step="0.01" name="internally_managed_fund" class="w-full border rounded p-2 text-sm"></div>
+                            <div class="bg-green-50 p-2 rounded"><label class="text-xs font-bold text-green-700">Total Funds Released</label><input type="number" step="0.01" name="total_funds_released" class="w-full border border-green-300 rounded p-2 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- 6. Tranches -->
+                    <div x-show="activeTab === 'tranches'" class="space-y-4">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">1st Tranche Amount</label><input type="number" step="0.01" name="first_tranche" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">2nd Tranche Amount</label><input type="number" step="0.01" name="second_tranche" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">3rd Tranche Amount</label><input type="number" step="0.01" name="third_tranche" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                            <p class="font-semibold">💡 DOST Tranche Tracking</p>
+                            <p class="text-xs mt-1">Detailed tranche releases with liquidation status, check numbers, and eligibility tracking can be managed after project creation via the Tranche Management section.</p>
+                        </div>
+                    </div>
+
+                    <!-- 7. Liquidation -->
+                    <div x-show="activeTab === 'liquidation'" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Check/ADA No.</label><input type="text" name="check_ada_no" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Liquidation Status</label><input type="text" name="status_of_liquidation" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Date Liquidated</label><input type="date" name="date_of_liquidation" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Amount Liquidated</label><input type="number" step="0.01" name="amount_liquidated" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- 8. Timeline -->
+                    <div x-show="activeTab === 'timeline'" class="grid grid-cols-2 gap-4">
+                        <div><label class="text-xs font-bold text-gray-600">Project Start</label><input type="date" name="project_start" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Project End</label><input type="date" name="project_end" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Date Released</label><input type="date" name="date_of_release" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Completion Date</label><input type="date" name="date_of_completion" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Original Duration</label><input type="text" name="original_project_duration" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Extension Date</label><input type="text" name="extension_date" class="w-full border rounded p-2 text-sm"></div>
+                    </div>
+
+                    <!-- 9. Checklist & Files -->
+                    <div x-show="activeTab === 'checklist'" class="space-y-4">
+                        <div class="grid grid-cols-4 gap-2">
+                            <div><label class="text-xs text-gray-600">TAFR</label>
+                                <select name="tafr" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">PAR</label>
+                                <select name="par" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">Terminal Report</label>
+                                <select name="terminal_report" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">Invoice/Receipt</label>
+                                <select name="invoice_receipt" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div><label class="text-xs text-gray-600">Donated</label>
+                                <select name="donated" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">Date of Donation</label><input type="date" name="date_of_donation" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Donation Status</label><input type="text" name="donation_status" class="w-full border rounded p-1 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">List of Equipment</label><textarea name="list_of_eqpt" rows="2" class="w-full border rounded p-2 text-sm"></textarea></div>
+                            <div><label class="text-xs font-bold text-gray-600">Upload Support Docs</label><input type="file" name="supporting_documents" class="w-full border rounded p-2 text-xs"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Product Photo</label><input type="file" name="product_photo" class="w-full border rounded p-2 text-xs"></div>
+                            <div><label class="text-xs font-bold text-gray-600">PME Visit</label>
+                                <select name="pme_visit" class="w-full border rounded p-2 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+                    <button type="button" @click="openAdd = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow">Save Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================== -->
+    <!-- EDIT PROJECT MODAL          -->
+    <!-- =========================== -->
+    <div x-show="openEdit" 
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 overflow-y-auto py-8" 
+        x-cloak 
+        @click="openEdit = false"
+        style="display: none;">
+        <div @click.stop class="bg-white w-full max-w-6xl h-[90vh] rounded-lg shadow-lg flex flex-col" x-cloak>
+            <!-- Header -->
+            <div class="px-6 py-4 border-b flex justify-between items-center bg-amber-50 rounded-t-lg">
+                <h2 class="text-xl font-bold text-amber-800">Edit Project</h2>
+                <button @click="openEdit = false" class="text-gray-500 hover:text-red-500"><span class="material-icons">close</span></button>
+            </div>
+
+            <form method="POST" x-bind:action="`/projects/update/${editProject.id}/`" enctype="multipart/form-data" class="flex flex-col flex-grow overflow-hidden">
+                {% csrf_token %}
+                
+                <!-- Tabs -->
+                <div class="flex border-b bg-gray-100 px-6 space-x-1 overflow-x-auto">
+                    <template x-for="tab in ['identification', 'basic', 'location', 'beneficiaries', 'financials', 'tranches', 'liquidation', 'timeline', 'checklist']">
+                        <button type="button" @click="activeTab = tab" 
+                            :class="activeTab === tab ? 'bg-white border-t-2 border-amber-500 text-amber-700' : 'text-gray-600 hover:bg-gray-200'"
+                            class="px-4 py-2 text-sm font-medium capitalize focus:outline-none rounded-t-md transition">
+                            <span x-text="tab"></span>
+                        </button>
+                    </template>
+                </div>
+
+                <!-- Scrollable Content -->
+                <div class="flex-grow overflow-y-auto p-6 bg-white">
+                    
+                    <!-- 1. Identification -->
+                    <div x-show="activeTab === 'identification'" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div><label class="text-xs font-bold text-gray-600">No.</label><input type="number" name="no" x-model="editProject.no" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Project Code</label><input type="text" name="project_code" x-model="editProject.project_code" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Year</label><input type="number" name="year" x-model="editProject.year" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Status</label><input type="text" name="status" x-model="editProject.status" class="w-full border rounded p-2 text-sm"></div>
+                    </div>
+
+                    <!-- 2. Basic Info -->
+                    <div x-show="activeTab === 'basic'" class="space-y-4">
+                        <div><label class="text-xs font-bold text-gray-600">Project Title</label><textarea name="project_title" x-model="editProject.project_title" rows="2" class="w-full border rounded p-2 text-sm" required></textarea></div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Agency/Grantee</label><input type="text" name="agency_grantee" x-model="editProject.agency_grantee" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Program</label><input type="text" name="program" x-model="editProject.program" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Type of Project</label><input type="text" name="type_of_project" x-model="editProject.type_of_project" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Remarks</label><textarea name="remarks" x-model="editProject.remarks" rows="1" class="w-full border rounded p-2 text-sm"></textarea></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Tech Availed</label><textarea name="availed_technologies" x-model="editProject.availed_technologies" rows="2" class="w-full border rounded p-2 text-sm"></textarea></div>
+                            <div><label class="text-xs font-bold text-gray-600">Interventions</label><textarea name="interventions" x-model="editProject.interventions" rows="2" class="w-full border rounded p-2 text-sm"></textarea></div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Location (Dropdowns) -->
+                    <div x-show="activeTab === 'location'" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Municipality</label>
+                            <select name="mun" x-model="editProject.mun" class="w-full border rounded p-2 text-sm">
+                                <option value="">Select Municipality</option>
+                                <option value="Almeria">Almeria</option>
+                                <option value="Biliran">Biliran</option>
+                                <option value="Cabucgayan">Cabucgayan</option>
+                                <option value="Caibiran">Caibiran</option>
+                                <option value="Culaba">Culaba</option>
+                                <option value="Kawayan">Kawayan</option>
+                                <option value="Maripipi">Maripipi</option>
+                                <option value="Naval">Naval</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Province</label>
+                            <input type="text" name="province" x-model="editProject.province" readonly class="w-full border rounded p-2 bg-gray-100 text-sm cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">District</label>
+                            <input type="text" name="district" x-model="editProject.district" readonly class="w-full border rounded p-2 bg-gray-100 text-sm cursor-not-allowed">
+                        </div>
+                    </div>
+
+                    <!-- 4. Beneficiaries -->
+                    <div x-show="activeTab === 'beneficiaries'" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Beneficiary Name</label><input type="text" name="beneficiary" x-model="editProject.beneficiary" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Address</label><input type="text" name="beneficiary_address" x-model="editProject.beneficiary_address" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Contact Details</label><input type="text" name="contact_details" x-model="editProject.contact_details" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Proponent Details</label><input type="text" name="proponent_details" x-model="editProject.proponent_details" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-5 gap-2">
+                            <div><label class="text-xs text-gray-600">Male</label><input type="number" name="male" x-model="editProject.male" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Female</label><input type="number" name="female" x-model="editProject.female" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Total</label><input type="number" name="total_beneficiaries" x-model="editProject.total_beneficiaries" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Senior</label><input type="number" name="senior_citizen" x-model="editProject.senior_citizen" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">PWD</label><input type="number" name="pwd" x-model="editProject.pwd" class="w-full border rounded p-1 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Financials -->
+                    <div x-show="activeTab === 'financials'" class="space-y-4">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">Fund Source</label>
+                                <select name="fund_source" x-model="editProject.fund_source" class="w-full border rounded p-2 text-sm">
+                                    <option value="">-- Select Fund Source --</option>
+                                    <template x-for="budget in availableBudgets" :key="budget.id">
+                                        <option :value="budget.fund_source + '|' + budget.fiscal_year" x-text="budget.fund_source + ' (' + budget.fiscal_year + ') - ₱' + budget.remaining_amount.toLocaleString('en-PH', {minimumFractionDigits: 2}) + ' remaining'"></option>
+                                    </template>
+                                </select>
+                                <p x-show="editProject.fund_source" class="text-xs text-blue-600 mt-1" 
+                                   x-text="(() => { 
+                                       const [fs, yr] = (editProject.fund_source || '').split('|');
+                                       const b = availableBudgets.find(b => b.fund_source === fs && b.fiscal_year == yr) || availableBudgets.find(b => b.fund_source === editProject.fund_source);
+                                       return b ? 'Available: ₱' + b.remaining_amount.toLocaleString('en-PH', {minimumFractionDigits: 2}) + ' of ₱' + b.total_amount.toLocaleString('en-PH', {minimumFractionDigits: 2}) : '';
+                                   })()">
+                                </p>
+                            </div>
+                            <div><label class="text-xs font-bold text-gray-600">Approved Funds</label><input type="number" step="0.01" name="funds" x-model="editProject.funds" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Total Project Cost</label><input type="number" step="0.01" name="total_project_cost" x-model="editProject.total_project_cost" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <!-- Removed DOST VIII as requested -->
+                            <div><label class="text-xs font-bold text-gray-600">Counterpart Funds</label><input type="number" step="0.01" name="counterpart_funds" x-model="editProject.counterpart_funds" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Internal Fund</label><input type="number" step="0.01" name="internally_managed_fund" x-model="editProject.internally_managed_fund" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 bg-green-50 p-2 rounded">
+                            <div><label class="text-xs font-bold text-green-700">Total Funds Released</label><input type="number" step="0.01" name="total_funds_released" x-model="editProject.total_funds_released" class="w-full border border-green-300 rounded p-2 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- 6. Tranches -->
+                    <div x-show="activeTab === 'tranches'" class="space-y-4">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">1st Tranche Amount</label><input type="number" step="0.01" name="first_tranche" x-model="editProject.first_tranche" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">2nd Tranche Amount</label><input type="number" step="0.01" name="second_tranche" x-model="editProject.second_tranche" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">3rd Tranche Amount</label><input type="number" step="0.01" name="third_tranche" x-model="editProject.third_tranche" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                            <p class="font-semibold">💡 DOST Tranche Tracking</p>
+                            <p class="text-xs mt-1">Detailed tranche releases with liquidation status, check numbers, and eligibility tracking can be managed in the Tranche Management section below.</p>
+                        </div>
+                    </div>
+
+                    <!-- 7. Liquidation -->
+                    <div x-show="activeTab === 'liquidation'" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Check/ADA No.</label><input type="text" name="check_ada_no" x-model="editProject.check_ada_no" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Liquidation Status</label><input type="text" name="status_of_liquidation" x-model="editProject.status_of_liquidation" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">Date Liquidated</label><input type="date" name="date_of_liquidation" x-model="editProject.date_of_liquidation" class="w-full border rounded p-2 text-sm"></div>
+                            <div><label class="text-xs font-bold text-gray-600">Amount Liquidated</label><input type="number" step="0.01" name="amount_liquidated" x-model="editProject.amount_liquidated" class="w-full border rounded p-2 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- 8. Timeline -->
+                    <div x-show="activeTab === 'timeline'" class="grid grid-cols-2 gap-4">
+                        <div><label class="text-xs font-bold text-gray-600">Project Start</label><input type="date" name="project_start" x-model="editProject.project_start" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Project End</label><input type="date" name="project_end" x-model="editProject.project_end" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Date Released</label><input type="date" name="date_of_release" x-model="editProject.date_of_release" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Completion Date</label><input type="date" name="date_of_completion" x-model="editProject.date_of_completion" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Original Duration</label><input type="text" name="original_project_duration" x-model="editProject.original_project_duration" class="w-full border rounded p-2 text-sm"></div>
+                        <div><label class="text-xs font-bold text-gray-600">Extension Date</label><input type="text" name="extension_date" x-model="editProject.extension_date" class="w-full border rounded p-2 text-sm"></div>
+                    </div>
+
+                    <!-- 9. Checklist & Files -->
+                    <div x-show="activeTab === 'checklist'" class="space-y-4">
+                        <div class="grid grid-cols-4 gap-2">
+                            <div><label class="text-xs text-gray-600">TAFR (Yes/No)</label>
+                                <select name="tafr" x-model="editProject.tafr" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">PAR (Yes/No)</label>
+                                <select name="par" x-model="editProject.par" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">Terminal Report</label>
+                                <select name="terminal_report" x-model="editProject.terminal_report" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">Invoice/Receipt</label>
+                                <select name="invoice_receipt" x-model="editProject.invoice_receipt" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div><label class="text-xs text-gray-600">Donated</label>
+                                <select name="donated" x-model="editProject.donated" class="w-full border rounded p-1 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-600">Date of Donation</label><input type="date" name="date_of_donation" x-model="editProject.date_of_donation" class="w-full border rounded p-1 text-sm"></div>
+                            <div><label class="text-xs text-gray-600">Donation Status</label><input type="text" name="donation_status" x-model="editProject.donation_status" class="w-full border rounded p-1 text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-gray-600">List of Equipment</label><textarea name="list_of_eqpt" x-model="editProject.list_of_eqpt" rows="2" class="w-full border rounded p-2 text-sm"></textarea></div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">Upload Support Docs</label>
+                                <input type="file" name="supporting_documents" class="w-full border rounded p-2 text-xs">
+                                <template x-if="editProject.supporting_documents_url">
+                                    <a :href="editProject.supporting_documents_url" target="_blank" class="text-blue-600 hover:underline text-xs mt-1 block">Current: Document</a>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-600">Product Photo</label>
+                                <input type="file" name="product_photo" class="w-full border rounded p-2 text-xs">
+                                <template x-if="editProject.product_photo_url">
+                                    <a :href="editProject.product_photo_url" target="_blank" class="text-blue-600 hover:underline text-xs mt-1 block">Current: Photo</a>
+                                </template>
+                            </div>
+                            <div><label class="text-xs font-bold text-gray-600">PME Visit (Yes/No)</label>
+                                <select name="pme_visit" x-model="editProject.pme_visit" class="w-full border rounded p-2 text-sm">
+                                    <option value="">-</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+                    <button type="button" @click="openEdit = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 shadow">Update Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================== -->
+    <!-- PROJECT DETAILS VIEW MODAL  -->
+    <!-- =========================== -->
+    <div x-show="openView" 
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 overflow-y-auto py-8" 
+        x-cloak 
+        @click="openView = false"
+        style="display: none;">
+        <div @click.stop class="bg-white w-full max-w-4xl max-h-[90vh] rounded-lg shadow-lg flex flex-col" x-cloak>
+            <!-- Header -->
+            <div class="px-6 py-4 border-b flex justify-between items-center bg-blue-50 rounded-t-lg">
+                <h2 class="text-xl font-bold text-blue-800">Project Details</h2>
+                <button @click="openView = false" class="text-gray-500 hover:text-red-500"><span class="material-icons">close</span></button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6 max-h-[calc(90vh-120px)]">
+                <!-- Basic Information -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">Project Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Project Title</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.project_title || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Status</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.status || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Program</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.program || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Type</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.type_of_project || '-'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">Location</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Municipality</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.mun || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Province</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.province || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">District</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.district || '-'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Beneficiaries -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">Beneficiaries</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Beneficiary Name</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.beneficiary || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">No. of Beneficiaries</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.no_of_beneficiaries || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Contact Details</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.contact_details || '-'"></p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                        <div class="bg-blue-50 p-2 rounded">
+                            <label class="text-xs font-bold text-blue-600">Male</label>
+                            <p class="text-sm font-semibold" x-text="viewProject.male || '0'"></p>
+                        </div>
+                        <div class="bg-pink-50 p-2 rounded">
+                            <label class="text-xs font-bold text-pink-600">Female</label>
+                            <p class="text-sm font-semibold" x-text="viewProject.female || '0'"></p>
+                        </div>
+                        <div class="bg-yellow-50 p-2 rounded">
+                            <label class="text-xs font-bold text-yellow-600">Senior</label>
+                            <p class="text-sm font-semibold" x-text="viewProject.senior_citizen || '0'"></p>
+                        </div>
+                        <div class="bg-purple-50 p-2 rounded">
+                            <label class="text-xs font-bold text-purple-600">PWD</label>
+                            <p class="text-sm font-semibold" x-text="viewProject.pwd || '0'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financials -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">Financial Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Fund Source</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.fund_source || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Allocated Funds</label>
+                            <p class="text-sm font-semibold text-blue-700" x-text="'₱' + (parseFloat(viewProject.funds || 0).toFixed(2))"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Released</label>
+                            <p class="text-sm font-semibold text-green-700" x-text="'₱' + (parseFloat(viewProject.total_funds_released || 0).toFixed(2))"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Liquidated</label>
+                            <p class="text-sm font-semibold text-orange-700" x-text="'₱' + (parseFloat(viewProject.amount_liquidated || 0).toFixed(2))"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dates -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">Timeline</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Project Start</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.project_start || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Project End</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.project_end || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Date of Release</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.date_of_release || '-'"></p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">Date of Completion</label>
+                            <p class="text-sm text-gray-800" x-text="viewProject.date_of_completion || '-'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Documents -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">Documents & Files</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="border rounded p-3 flex items-center justify-between">
+                            <span class="text-sm font-semibold">TAFR</span>
+                            <span class="text-xs px-2 py-1 rounded" :class="viewProject.tafr === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'" x-text="viewProject.tafr || '-'"></span>
+                        </div>
+                        <div class="border rounded p-3 flex items-center justify-between">
+                            <span class="text-sm font-semibold">PAR</span>
+                            <span class="text-xs px-2 py-1 rounded" :class="viewProject.par === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'" x-text="viewProject.par || '-'"></span>
+                        </div>
+                        <div class="border rounded p-3 flex items-center justify-between">
+                            <span class="text-sm font-semibold">Terminal Report</span>
+                            <span class="text-xs px-2 py-1 rounded" :class="viewProject.terminal_report === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'" x-text="viewProject.terminal_report || '-'"></span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                        <div class="border rounded p-3 flex items-center justify-between">
+                            <span class="text-sm font-semibold">Invoice Receipt</span>
+                            <span class="text-xs px-2 py-1 rounded" :class="viewProject.invoice_receipt === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'" x-text="viewProject.invoice_receipt || '-'"></span>
+                        </div>
+                        <div class="border rounded p-3 flex items-center justify-between">
+                            <span class="text-sm font-semibold">Donation</span>
+                            <span class="text-xs px-2 py-1 rounded" :class="viewProject.donated === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'" x-text="viewProject.donated || '-'"></span>
+                        </div>
+                        <div class="border rounded p-3 flex items-center justify-between">
+                            <span class="text-sm font-semibold">PME Visit</span>
+                            <span class="text-xs px-2 py-1 rounded" :class="viewProject.pme_visit === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'" x-text="viewProject.pme_visit || '-'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supporting Files -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2">Supporting Files</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <template x-if="viewProject.supporting_documents_url">
+                            <a :href="viewProject.supporting_documents_url" target="_blank" class="flex items-center gap-2 p-3 border border-blue-300 bg-blue-50 rounded text-blue-700 hover:bg-blue-100">
+                                <span class="material-icons text-sm">description</span>
+                                <span class="text-sm font-semibold">Supporting Documents</span>
+                                <span class="material-icons text-sm ml-auto">open_in_new</span>
+                            </a>
+                        </template>
+                        <template x-if="viewProject.product_photo_url">
+                            <a :href="viewProject.product_photo_url" target="_blank" class="flex items-center gap-2 p-3 border border-green-300 bg-green-50 rounded text-green-700 hover:bg-green-100">
+                                <span class="material-icons text-sm">image</span>
+                                <span class="text-sm font-semibold">Product Photo</span>
+                                <span class="material-icons text-sm ml-auto">open_in_new</span>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- DOST Equipment Tracking Section -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-b pb-2 flex items-center gap-2">
+                        <span class="material-icons text-blue-600 text-lg">inventory_2</span>
+                        Equipment Tracking (DOST Compliance)
+                    </h3>
+                    <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4">
+                        <p class="text-xs text-blue-700">
+                            <span class="font-bold">DOST 3-Year Ownership Policy:</span> 
+                            Equipment remains under DOST ownership for 3 years from delivery date. After completion of the lease period, ownership may be transferred to the beneficiary.
+                        </p>
+                    </div>
+                    
+                    <!-- Equipment List -->
+                    <div class="mb-4">
+                        <label class="text-xs font-bold text-gray-600">Equipment List</label>
+                        <p class="text-sm text-gray-800 whitespace-pre-wrap bg-gray-50 p-2 rounded border" x-text="viewProject.list_of_eqpt || 'No equipment listed'"></p>
+                    </div>
+                    
+                    <!-- Equipment Summary (from ProjectEquipment model) -->
+                    <template x-if="viewProject.equipment_summary">
+                        <div class="space-y-3">
+                            <template x-for="(equipment, index) in viewProject.equipment_summary" :key="index">
+                                <div class="border rounded-lg p-3 bg-white shadow-sm">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span class="font-semibold text-gray-800" x-text="equipment.name"></span>
+                                            <span class="text-xs text-gray-500 ml-2" x-text="'Qty: ' + equipment.quantity"></span>
+                                        </div>
+                                        <span class="text-xs px-2 py-1 rounded-full"
+                                            :class="{
+                                                'bg-blue-100 text-blue-700': equipment.ownership_status === 'leased',
+                                                'bg-green-100 text-green-700': equipment.ownership_status === 'transferred',
+                                                'bg-orange-100 text-orange-700': equipment.ownership_status === 'pending_transfer',
+                                                'bg-gray-100 text-gray-700': equipment.ownership_status === 'returned'
+                                            }"
+                                            x-text="equipment.ownership_status_display"></span>
+                                    </div>
+                                    
+                                    <!-- Property Tag -->
+                                    <div class="grid grid-cols-2 gap-2 text-xs mb-2">
+                                        <div>
+                                            <span class="text-gray-500">Property Tag #:</span>
+                                            <span class="font-mono font-bold text-blue-600" x-text="equipment.property_tag || 'Not assigned'"></span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500">Unit Cost:</span>
+                                            <span class="font-semibold" x-text="'₱' + parseFloat(equipment.unit_cost || 0).toLocaleString()"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    
+                    <!-- No equipment message -->
+                    <template x-if="!viewProject.equipment_summary || viewProject.equipment_summary.length === 0">
+                        <div class="text-center py-4 text-gray-500 text-sm">
+                            <span class="material-icons text-3xl text-gray-300 mb-2">inventory</span>
+                            <p>No detailed equipment tracking data available</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+                <button @click="openView = false" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================== -->
+    <!-- DELETE PROJECT CONFIRMATION MODAL -->
+    <!-- =========================== -->
+    <div x-show="openDelete" 
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 py-8" 
+        x-cloak 
+        style="display: none;">
+        <div @click.stop class="bg-white w-full max-w-md p-6 rounded-lg shadow-lg">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-shrink-0 bg-red-100 rounded-full p-2">
+                    <span class="material-icons text-red-600">warning</span>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Delete Project</h2>
+            </div>
+            <p class="text-gray-600 mb-4">Are you sure you want to delete project "<strong x-text="deleteProject.title"></strong>"? This action cannot be undone.</p>
+            <form method="POST" :action="`/projects/delete/${deleteProject.id}/`">
+                {% csrf_token %}
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="openDelete = false"
+                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================== -->
+    <!-- MASS DELETE CONFIRMATION MODAL -->
+    <!-- =========================== -->
+    <div x-show="openMassDelete" 
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" 
+        x-cloak 
+        style="display: none;">
+        <div @click.stop class="bg-white w-full max-w-md p-6 rounded-lg shadow-lg">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-shrink-0 bg-red-100 rounded-full p-2">
+                    <span class="material-icons text-red-600">warning</span>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Delete Multiple Projects</h2>
+            </div>
+            <p class="text-gray-600 mb-4">Are you sure you want to delete <strong x-text="selectedIds.length"></strong> project(s)? This action cannot be undone.</p>
+            <form method="POST" action="{% url 'administrator_projects_mass_delete_url' %}">
+                {% csrf_token %}
+                <template x-for="id in selectedIds" :key="id">
+                    <input type="hidden" name="ids" :value="id">
+                </template>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="openMassDelete = false"
+                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete All</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================== -->
+    <!-- EQUIPMENT DELIVERY MODAL (DOST Compliance) -->
+    <!-- =========================== -->
+    <div x-show="openEquipmentDelivery" 
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 overflow-y-auto py-8" 
+        x-cloak 
+        @click="openEquipmentDelivery = false"
+        style="display: none;">
+        <div @click.stop class="bg-white w-full max-w-2xl rounded-lg shadow-lg">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b flex justify-between items-center bg-blue-50 rounded-t-lg">
+                <div class="flex items-center gap-2">
+                    <span class="material-icons text-blue-600">inventory_2</span>
+                    <h2 class="text-lg font-bold text-blue-800">Record Equipment Delivery</h2>
+                </div>
+                <button @click="openEquipmentDelivery = false" class="text-gray-500 hover:text-red-500">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            
+            <!-- Content -->
+            <form method="POST" action="{% url 'administrator_equipment_delivery_add' %}" class="p-6">
+                {% csrf_token %}
+                <input type="hidden" name="project_id" x-model="equipmentDelivery.project_id">
+                
+                <!-- DOST Compliance Info -->
+                <div class="bg-blue-100 border border-blue-300 p-3 rounded-lg mb-4">
+                    <p class="text-xs text-blue-700">
+                        <span class="material-icons text-sm align-middle">info</span>
+                        <strong>DOST Equipment Tracking:</strong> 
+                        Record equipment deliveries with property tag numbers for inventory audits and DOST compliance monitoring.
+                    </p>
+                </div>
+                
+                <!-- Project Info -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg border">
+                    <label class="text-xs font-bold text-gray-600">Project</label>
+                    <p class="text-sm font-semibold text-gray-800" x-text="equipmentDelivery.project_title"></p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Equipment Name -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Equipment Name *</label>
+                        <input type="text" name="equipment_name" x-model="equipmentDelivery.equipment_name" required
+                            class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"
+                            placeholder="e.g., Solar Dryer, Fish Processing Machine">
+                    </div>
+                    
+                    <!-- Equipment Category -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Equipment Category *</label>
+                        <select name="equipment_category" required
+                            class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Category</option>
+                            {% for category in equipment_categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% empty %}
+                            <option value="">No categories available</option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Categorize equipment for reporting</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Quantity -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Quantity *</label>
+                        <input type="number" name="quantity" x-model="equipmentDelivery.quantity" min="1" required
+                            class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <!-- Property Tag Number -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">
+                            Property Tag Number *
+                            <span class="text-blue-500 font-normal">(DOST Format)</span>
+                        </label>
+                        <input type="text" name="property_tag_number" x-model="equipmentDelivery.property_tag_number" required
+                            class="w-full border rounded-lg p-2 text-sm font-mono focus:ring-2 focus:ring-blue-500"
+                            placeholder="e.g., DOST-R08-2024-001">
+                        <p class="text-xs text-gray-500 mt-1">Format: DOST-[Region]-[Year]-[Sequence]</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Serial Numbers -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Serial Number(s)</label>
+                        <input type="text" name="serial_numbers" x-model="equipmentDelivery.serial_numbers"
+                            class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"
+                            placeholder="Multiple serials separated by comma">
+                    </div>
+                    
+                    <!-- Delivery Date -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Delivery Date *</label>
+                        <input type="date" name="delivery_date" x-model="equipmentDelivery.delivery_date" required
+                            class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Received By -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Received By *</label>
+                        <input type="text" name="received_by" x-model="equipmentDelivery.received_by" required
+                            class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"
+                            placeholder="Name of person who received the equipment">
+                    </div>
+                    
+                    <!-- Condition Notes -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Condition Notes</label>
+                        <input type="text" name="condition_notes" x-model="equipmentDelivery.condition_notes"
+                            class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"
+                            placeholder="e.g., Good condition, minor scratches">
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <div class="flex justify-end gap-2 pt-4 border-t">
+                    <button type="button" @click="openEquipmentDelivery = false"
+                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1">
+                        <span class="material-icons text-sm">save</span>
+                        Record Delivery
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<!-- DATA INJECTION -->
+<script id="projects-data" type="application/json">
+{
+    "projects": [
+    {% for project in projects %}
+    {
+        "id": "{{ project.id }}",
+        "title": "{{ project.project_title|escapejs }}",
+        "funds": {{ project.funds|default:0 }},
+        "released": {{ project.total_funds_released|default:0 }},
+        "liquidated": {{ project.amount_liquidated|default:0 }},
+        "status": "{{ project.status|escapejs|default:'Unknown' }}",
+        "male": {{ project.male|default:0 }},
+        "female": {{ project.female|default:0 }},
+        "senior": {{ project.senior_citizen|default:0 }},
+        "pwd": {{ project.pwd|default:0 }},
+        "province": "{{ project.province|escapejs|default:'Unknown' }}",
+        "program": "{{ project.program|escapejs|default:'' }}",
+        "fund_source": "{{ project.fund_source|escapejs|default:'' }}",
+        "municipality": "{{ project.mun|escapejs|default:'' }}",
+        "project_start": "{{ project.project_start|date:'Y-m-d'|default_if_none:'' }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+    ],
+    "editData": {
+    {% for project in projects %}
+        "{{ project.id }}": {
+            "id": "{{ project.id }}",
+            "no": "{{ project.no|default_if_none:'' }}",
+            "project_code": "{{ project.project_code|default_if_none:'' }}",
+            "year": "{{ project.year|default_if_none:'' }}",
+            "status": "{{ project.status|default_if_none:'' }}",
+            "project_title": "{{ project.project_title|escapejs }}",
+            "agency_grantee": "{{ project.agency_grantee|escapejs }}",
+            "program": "{{ project.program|escapejs }}",
+            "type_of_project": "{{ project.type_of_project|escapejs }}",
+            "remarks": "{{ project.remarks|escapejs }}",
+            "mun": "{{ project.mun|escapejs }}",
+            "province": "{{ project.province|escapejs }}",
+            "district": "{{ project.district|escapejs }}",
+            "beneficiary": "{{ project.beneficiary|escapejs }}",
+            "beneficiary_address": "{{ project.beneficiary_address|escapejs }}",
+            "contact_details": "{{ project.contact_details|escapejs }}",
+            "proponent_details": "{{ project.proponent_details|escapejs }}",
+            "no_of_beneficiaries": "{{ project.no_of_beneficiaries|default_if_none:'' }}",
+            "male": "{{ project.male|default_if_none:'' }}",
+            "female": "{{ project.female|default_if_none:'' }}",
+            "total_beneficiaries": "{{ project.total_beneficiaries|default_if_none:'' }}",
+            "senior_citizen": "{{ project.senior_citizen|default_if_none:'' }}",
+            "pwd": "{{ project.pwd|default_if_none:'' }}",
+            "fund_source": "{{ project.fund_source|escapejs }}",
+            "funds": "{{ project.funds|default_if_none:'' }}",
+            "total_project_cost": "{{ project.total_project_cost|default_if_none:'' }}",
+            "counterpart_funds": "{{ project.counterpart_funds|default_if_none:'' }}",
+            "internally_managed_fund": "{{ project.internally_managed_fund|default_if_none:'' }}",
+            "total_funds_released": "{{ project.total_funds_released|default_if_none:'' }}",
+            "first_tranche": "{{ project.first_tranche|default_if_none:'' }}",
+            "second_tranche": "{{ project.second_tranche|default_if_none:'' }}",
+            "third_tranche": "{{ project.third_tranche|default_if_none:'' }}",
+            "check_ada_no": "{{ project.check_ada_no|escapejs }}",
+            "status_of_liquidation": "{{ project.status_of_liquidation|escapejs }}",
+            "date_of_liquidation": "{{ project.date_of_liquidation|date:'Y-m-d'|default_if_none:'' }}",
+            "amount_liquidated": "{{ project.amount_liquidated|default_if_none:'' }}",
+            "project_start": "{{ project.project_start|date:'Y-m-d'|default_if_none:'' }}",
+            "project_end": "{{ project.project_end|date:'Y-m-d'|default_if_none:'' }}",
+            "date_of_release": "{{ project.date_of_release|date:'Y-m-d'|default_if_none:'' }}",
+            "date_of_completion": "{{ project.date_of_completion|date:'Y-m-d'|default_if_none:'' }}",
+            "original_project_duration": "{{ project.original_project_duration|escapejs }}",
+            "extension_date": "{{ project.extension_date|escapejs }}",
+            "availed_technologies": "{{ project.availed_technologies|escapejs }}",
+            "interventions": "{{ project.interventions|escapejs }}",
+            "tafr": "{{ project.tafr|escapejs }}",
+            "par": "{{ project.par|escapejs }}",
+            "list_of_eqpt": "{{ project.list_of_eqpt|escapejs }}",
+            "terminal_report": "{{ project.terminal_report|escapejs }}",
+            "invoice_receipt": "{{ project.invoice_receipt|escapejs }}",
+            "donated": "{{ project.donated|escapejs }}",
+            "date_of_donation": "{{ project.date_of_donation|date:'Y-m-d'|default_if_none:'' }}",
+            "acknowledgment_receipt_by_grantee": "{{ project.acknowledgment_receipt_by_grantee|escapejs }}",
+            "donation_status": "{{ project.donation_status|escapejs }}",
+            "pme_visit": "{{ project.pme_visit|escapejs }}",
+            "womens_group": "{{ project.womens_group|escapejs }}",
+            "supporting_documents_url": "{% if project.supporting_documents %}{{ project.supporting_documents.url }}{% endif %}",
+            "product_photo_url": "{% if project.product_photo %}{{ project.product_photo.url }}{% endif %}"
+        }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+    }
+}
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        $('#projectsTable').DataTable({
+            responsive: true,
+            scrollX: true,
+            language: { searchPlaceholder: "Search projects...", search: "" },
+            dom: '<"flex flex-col md:flex-row justify-between items-center mb-4 space-y-2 md:space-y-0"f>rt<"flex flex-col md:flex-row justify-between items-center mt-4 text-sm text-gray-500"lip>',
+        });
+
+        // Charts Logic
+        let projectsData = [];
+        try {
+            const jsonElement = document.getElementById('projects-data');
+            if(jsonElement) {
+                const allData = JSON.parse(jsonElement.textContent);
+                projectsData = allData.projects || [];
+            }
+        } catch (error) { console.error("Error parsing charts:", error); }
+
+        // 1. Top 10 Projects by Funding (Horizontal Bar)
+        const sortedByFunding = [...projectsData]
+            .filter(p => p.funds > 0)
+            .sort((a, b) => b.funds - a.funds)
+            .slice(0, 10);
+        
+        const topProjectLabels = sortedByFunding.map(p => 
+            p.title.length > 25 ? p.title.substring(0, 25) + '...' : p.title
+        );
+        const topProjectFunds = sortedByFunding.map(p => p.funds);
+
+        new Chart(document.getElementById('financialChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: topProjectLabels,
+                datasets: [{
+                    label: 'Funding (₱)',
+                    data: topProjectFunds,
+                    backgroundColor: [
+                        'rgba(99, 102, 241, 0.8)',
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(239, 68, 68, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(236, 72, 153, 0.8)',
+                        'rgba(34, 197, 94, 0.8)',
+                        'rgba(251, 146, 60, 0.8)',
+                        'rgba(168, 85, 247, 0.8)'
+                    ],
+                    borderRadius: 4,
+                    barThickness: 12
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => '₱' + Number(ctx.raw).toLocaleString()
+                        }
+                    }
+                },
+                scales: {
+                    x: { 
+                        beginAtZero: true,
+                        ticks: { 
+                            callback: (val) => val >= 1000000 ? '₱' + (val/1000000).toFixed(1) + 'M' : '₱' + (val/1000).toFixed(0) + 'K'
+                        }
+                    },
+                    y: {
+                        ticks: { font: { size: 9 } }
+                    }
+                }
+            }
+        });
+
+        // 2. Demographics Chart (Pie)
+        const totalMale = projectsData.reduce((acc, p) => acc + p.male, 0);
+        const totalFemale = projectsData.reduce((acc, p) => acc + p.female, 0);
+        const totalSenior = projectsData.reduce((acc, p) => acc + p.senior, 0);
+        const totalPWD = projectsData.reduce((acc, p) => acc + p.pwd, 0);
+
+        new Chart(document.getElementById('demographicsChart').getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: ['Male', 'Female', 'Senior', 'PWD'],
+                datasets: [{
+                    data: [totalMale, totalFemale, totalSenior, totalPWD],
+                    backgroundColor: ['#3B82F6', '#EC4899', '#F59E0B', '#10B981'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+
+        // 3. Status Chart (Doughnut)
+        const statusCounts = {};
+        projectsData.forEach(p => { 
+            // Normalize status to capitalize first letter (handles "Ongoing" vs "ongoing" etc.)
+            const normalizedStatus = p.status ? p.status.charAt(0).toUpperCase() + p.status.slice(1).toLowerCase() : 'Unknown';
+            statusCounts[normalizedStatus] = (statusCounts[normalizedStatus] || 0) + 1; 
+        });
+        
+        new Chart(document.getElementById('statusChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statusCounts),
+                datasets: [{ 
+                    data: Object.values(statusCounts), 
+                    backgroundColor: ['#3B82F6', '#10B981', '#F43F5E', '#F59E0B', '#8B5CF6'], 
+                    hoverOffset: 4 
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { legend: { position: 'right' } } 
+            }
+        });
+
+        // 4. Projects by Program (Horizontal Bar Chart)
+        const programCounts = {};
+        projectsData.forEach(p => { 
+            programCounts[p.program || 'Unassigned'] = (programCounts[p.program || 'Unassigned'] || 0) + 1; 
+        });
+        
+        new Chart(document.getElementById('programChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(programCounts),
+                datasets: [{
+                    label: 'Number of Projects',
+                    data: Object.values(programCounts),
+                    backgroundColor: '#8B5CF6',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+
+        // 5. Projects by Fund Source (Doughnut)
+        const fundSourceCounts = {};
+        projectsData.forEach(p => { 
+            fundSourceCounts[p.fund_source || 'Unassigned'] = (fundSourceCounts[p.fund_source || 'Unassigned'] || 0) + 1; 
+        });
+        
+        new Chart(document.getElementById('fundSourceChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(fundSourceCounts),
+                datasets: [{
+                    data: Object.values(fundSourceCounts),
+                    backgroundColor: ['#F97316', '#EF4444', '#EC4899', '#D946EF', '#A855F7', '#06B6D4'],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+
+        // 6. Top Municipalities (Horizontal Bar - Top 10)
+        const municipalityCounts = {};
+        projectsData.forEach(p => { 
+            municipalityCounts[p.municipality || 'Unassigned'] = (municipalityCounts[p.municipality || 'Unassigned'] || 0) + 1; 
+        });
+        
+        const sortedMun = Object.entries(municipalityCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+        
+        new Chart(document.getElementById('municipalityChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: sortedMun.map(m => m[0]),
+                datasets: [{
+                    label: 'Projects',
+                    data: sortedMun.map(m => m[1]),
+                    backgroundColor: '#14B8A6',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+
+        // 7. Projects by Year (Line Chart)
+        const yearCounts = {};
+        projectsData.forEach(p => { 
+            const year = new Date(p.project_start).getFullYear() || 'Unknown';
+            yearCounts[year] = (yearCounts[year] || 0) + 1; 
+        });
+        
+        const sortedYears = Object.entries(yearCounts)
+            .sort((a, b) => a[0] - b[0]);
+        
+        new Chart(document.getElementById('yearChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: sortedYears.map(y => y[0]),
+                datasets: [{
+                    label: 'Number of Projects',
+                    data: sortedYears.map(y => y[1]),
+                    borderColor: '#EF4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#EF4444'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true } },
+                scales: { 
+                    y: { beginAtZero: true } 
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

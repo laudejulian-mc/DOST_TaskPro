@@ -1,0 +1,234 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Calendar - DOST Admin{% endblock %}
+
+{% block page-title %}
+<div class="flex items-center gap-2">
+    <span class="material-icons text-blue-600">calendar_month</span>
+    Calendar
+</div>
+{% endblock %}
+
+{% block styles %}
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+<style>
+    .fc-event {
+        cursor: pointer;
+        padding: 2px 5px;
+        border-radius: 4px;
+    }
+    .fc-toolbar-title {
+        font-size: 1.25rem !important;
+    }
+    .event-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+    }
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb (visible in Simple Mode) -->
+<nav class="breadcrumb">
+    <a href="{% url 'administrator_dashboard_url' %}">Dashboard</a>
+    <span class="separator">›</span>
+    <span class="current">Calendar</span>
+</nav>
+
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <!-- Header with Add Event Button -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-gray-800">Project & Task Calendar</h2>
+            <p class="text-sm text-gray-500">View all deadlines, tasks, and events in one place</p>
+        </div>
+        <button onclick="openAddEventModal()" 
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                data-tooltip="Add a new event to the calendar">
+            <span class="material-icons">add</span>
+            Add Event
+        </button>
+    </div>
+
+    <!-- Event Legend -->
+    <div class="event-legend bg-gray-50 p-4 rounded-lg mb-6">
+        <div class="legend-item">
+            <span class="legend-dot" style="background-color: #ef4444;"></span>
+            <span>Project Deadlines</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot" style="background-color: #3b82f6;"></span>
+            <span>Tasks (Pending)</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot" style="background-color: #10b981;"></span>
+            <span>Tasks (Completed)</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot" style="background-color: #8b5cf6;"></span>
+            <span>Meetings</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot" style="background-color: #f59e0b;"></span>
+            <span>Reminders</span>
+        </div>
+    </div>
+
+    <!-- Calendar Container -->
+    <div id="calendar"></div>
+</div>
+
+<!-- Add Event Modal -->
+<div id="addEventModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-800">Add New Event</h3>
+            <button onclick="closeAddEventModal()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-icons">close</span>
+            </button>
+        </div>
+        
+        <form action="{% url 'administrator_calendar_event_add' %}" method="POST">
+            {% csrf_token %}
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Event Title *</label>
+                    <input type="text" name="title" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description" rows="2"
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                        <input type="date" name="start_date" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                        <input type="date" name="end_date"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                        <select name="event_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="task">Task</option>
+                            <option value="deadline">Deadline</option>
+                            <option value="milestone">Milestone</option>
+                            <option value="meeting">Meeting</option>
+                            <option value="reminder">Reminder</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                        <select name="color" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="#3b82f6">🔵 Blue</option>
+                            <option value="#10b981">🟢 Green</option>
+                            <option value="#f59e0b">🟡 Yellow</option>
+                            <option value="#ef4444">🔴 Red</option>
+                            <option value="#8b5cf6">🟣 Purple</option>
+                            <option value="#ec4899">🩷 Pink</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" name="is_public" id="is_public" class="mr-2">
+                    <label for="is_public" class="text-sm text-gray-700">Make this event visible to all users</label>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="closeAddEventModal()" 
+                        class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Add Event
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        
+        // Calculate available height for calendar (viewport height minus header/padding)
+        function getCalendarHeight() {
+            const viewportHeight = window.innerHeight;
+            const headerOffset = 350; // Approximate space for header, legend, breadcrumb, toolbar
+            return Math.max(viewportHeight - headerOffset, 400); // Minimum 400px
+        }
+        
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            height: getCalendarHeight(),
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            events: '{% url "administrator_calendar_events_api" %}',
+            eventClick: function(info) {
+                alert('Event: ' + info.event.title);
+            },
+            dateClick: function(info) {
+                document.querySelector('input[name="start_date"]').value = info.dateStr;
+                openAddEventModal();
+            },
+            editable: false,
+            selectable: true,
+            dayMaxEvents: 3,
+            eventDisplay: 'block',
+            views: {
+                dayGridMonth: {
+                    dayMaxEvents: 3
+                }
+            }
+        });
+        calendar.render();
+        
+        // Resize calendar when window resizes
+        window.addEventListener('resize', function() {
+            calendar.setOption('height', getCalendarHeight());
+        });
+    });
+    
+    function openAddEventModal() {
+        document.getElementById('addEventModal').classList.remove('hidden');
+    }
+    
+    function closeAddEventModal() {
+        document.getElementById('addEventModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

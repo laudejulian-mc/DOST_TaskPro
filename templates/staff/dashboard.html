@@ -1,0 +1,244 @@
+{% extends "staff/base.html" %}
+{% load static %}
+
+{% block title %}Staff Dashboard{% endblock %}
+{% block nav_dashboard %}active-nav{% endblock %}
+{% block page_title %}My Dashboard{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<div class="space-y-6">
+    <!-- Welcome Message -->
+    <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
+        <h2 class="text-2xl font-bold">Welcome, {{ user.get_full_name }}!</h2>
+        <p class="mt-1 opacity-90">Here's an overview of your assigned projects.</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-white shadow rounded-lg p-5 border-l-4 border-blue-500">
+            <h3 class="text-sm font-medium text-gray-500">My Assignments</h3>
+            <p class="mt-2 text-3xl font-bold text-gray-800">{{ my_tasks_count }}</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-5 border-l-4 border-yellow-500">
+            <h3 class="text-sm font-medium text-gray-500">Pending</h3>
+            <p class="mt-2 text-3xl font-bold text-yellow-600">{{ pending_tasks }}</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-5 border-l-4 border-blue-400">
+            <h3 class="text-sm font-medium text-gray-500">In Progress</h3>
+            <p class="mt-2 text-3xl font-bold text-blue-600">{{ in_progress_tasks }}</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-5 border-l-4 border-green-500">
+            <h3 class="text-sm font-medium text-gray-500">Completed</h3>
+            <p class="mt-2 text-3xl font-bold text-green-600">{{ completed_tasks }}</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-5 border-l-4 border-red-500">
+            <h3 class="text-sm font-medium text-gray-500">Delayed</h3>
+            <p class="mt-2 text-3xl font-bold text-red-600">{{ delayed_tasks }}</p>
+        </div>
+    </div>
+
+    <!-- Map Section -->
+    <div class="bg-white p-6 rounded-xl shadow-lg">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-700">My Project Locations</h3>
+            <div class="text-sm text-gray-500 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
+                <span class="text-blue-600">💡</span> Having trouble with mouse navigation? Use arrow keys to pan, Enter to zoom in, Spacebar to zoom out!
+            </div>
+        </div>
+        <div id="taskMap" style="height: 400px; width: 100%;" class="rounded-lg border border-gray-300"></div>
+        <div class="mt-3 flex flex-wrap gap-4 text-sm">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> Pending</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> In Progress</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500"></span> Completed</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-red-500"></span> Delayed</span>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Assignment Status Chart -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">My Assignment Status</h3>
+            {% if my_tasks_count > 0 %}
+            <div style="max-width: 280px; margin: 0 auto;">
+                <canvas id="taskStatusChart"></canvas>
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 text-gray-500">
+                <span class="material-icons text-6xl mb-3 text-gray-300">assignment</span>
+                <p class="text-lg font-medium">No projects assigned yet</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Projects I'm Working On -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">Projects I'm Managing</h3>
+            {% if my_projects.count > 0 %}
+            <div class="space-y-3 max-h-80 overflow-y-auto">
+                {% for project in my_projects %}
+                <div class="p-3 bg-gray-50 rounded-lg border-l-4 
+                    {% if project.status == 'completed' %}border-green-500
+                    {% elif project.status == 'ongoing' %}border-blue-500
+                    {% elif project.status == 'terminated' %}border-red-500
+                    {% else %}border-gray-400{% endif %}">
+                    <h4 class="font-medium text-gray-800">{{ project.project_title|truncatewords:10 }}</h4>
+                    <span class="inline-block mt-1 px-2 py-0.5 text-xs rounded-full
+                        {% if project.status == 'completed' %}bg-green-100 text-green-700
+                        {% elif project.status == 'ongoing' %}bg-blue-100 text-blue-700
+                        {% elif project.status == 'terminated' %}bg-red-100 text-red-700
+                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {{ project.status|title }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 text-gray-500">
+                <span class="material-icons text-6xl mb-3 text-gray-300">work_outline</span>
+                <p class="text-lg font-medium">No projects yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Task Map
+const TASKS = JSON.parse('{{ tasks_json|escapejs }}');
+const BILIRAN_CENTER = [11.55, 124.47];
+
+const map = L.map('taskMap').setView(BILIRAN_CENTER, 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+// Center Biliran control (small pin inside map)
+// Biliran Province bounds (SW corner to NE corner)
+const BILIRAN_BOUNDS = L.latLngBounds(
+  [11.4700, 124.3400],  // Southwest corner
+  [11.7200, 124.6200]   // Northeast corner
+);
+
+const CenterControl = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function(map) {
+    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    const button = L.DomUtil.create('a', '', container);
+    button.href = '#';
+    button.title = 'Center on Biliran Province';
+    button.innerHTML = '<span style="font-size:18px;">📍</span>';
+    button.style.cssText = 'display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:#fff;cursor:pointer;';
+    L.DomEvent.disableClickPropagation(button);
+    L.DomEvent.on(button, 'click', function(e) {
+      L.DomEvent.preventDefault(e);
+      map.fitBounds(BILIRAN_BOUNDS, { padding: [20, 20] });
+    });
+    return container;
+  }
+});
+map.addControl(new CenterControl());
+
+const statusColors = {
+    pending: '#f59e0b',
+    in_progress: '#3b82f6',
+    completed: '#10b981',
+    delayed: '#ef4444'
+};
+
+function coloredIcon(color) {
+    return L.divIcon({
+        html: '<div style="width:20px;height:20px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>',
+        className: '',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+    });
+}
+
+const bounds = [];
+TASKS.forEach(task => {
+    if (task.latitude && task.longitude) {
+        const color = statusColors[task.status] || '#6b7280';
+        const marker = L.marker([task.latitude, task.longitude], { icon: coloredIcon(color) });
+        marker.bindPopup('<strong>Task</strong><br>' + task.project_title + '<br>Status: ' + task.status);
+        marker.addTo(map);
+        bounds.push([task.latitude, task.longitude]);
+    }
+});
+
+if (bounds.length > 0) {
+    map.fitBounds(bounds, { padding: [30, 30] });
+}
+
+// Arrow key navigation for map
+const PAN_DISTANCE = 100; // pixels to pan per key press
+
+document.addEventListener('keydown', function(e) {
+    // Only handle arrow keys when map is focused or when no input/textarea is focused
+    const activeElement = document.activeElement;
+    const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.contentEditable === 'true';
+    
+    if (!isInputFocused) {
+        switch(e.key) {
+            case 'ArrowUp':
+                e.preventDefault();
+                map.panBy([0, -PAN_DISTANCE]);
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                map.panBy([0, PAN_DISTANCE]);
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                map.panBy([-PAN_DISTANCE, 0]);
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                map.panBy([PAN_DISTANCE, 0]);
+                break;
+            case 'Enter':
+                e.preventDefault();
+                map.zoomIn();
+                break;
+            case ' ':
+                e.preventDefault();
+                map.zoomOut();
+                break;
+        }
+    }
+});
+
+// Focus map when clicked to enable keyboard navigation
+document.getElementById('taskMap').addEventListener('click', function() {
+    this.focus();
+});
+
+{% if my_tasks_count > 0 %}
+// Task Status Doughnut Chart
+const ctx = document.getElementById('taskStatusChart').getContext('2d');
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Pending', 'In Progress', 'Completed', 'Delayed'],
+        datasets: [{
+            data: [{{ pending_tasks }}, {{ in_progress_tasks }}, {{ completed_tasks }}, {{ delayed_tasks }}],
+            backgroundColor: ['#f59e0b', '#3b82f6', '#10b981', '#ef4444'],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        cutout: '60%',
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12 } }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

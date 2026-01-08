@@ -1,0 +1,755 @@
+{% extends "administrator/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Admin Dashboard{% endblock %}
+{% block nav_dashboard %}active-nav{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Leaflet CSS/JS + MarkerCluster -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster-src.js"></script>
+
+<div class="bg-white p-6 rounded-2xl shadow-lg mb-6 relative">
+
+  <!-- =========================== -->
+  <!-- 1. QUICK STATS CARDS (Top)  -->
+  <!-- =========================== -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 border-b border-gray-100 pb-8">
+      <div class="bg-white dark:bg-gray-700 shadow rounded-xl p-4 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between">
+              <div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Users</p>
+                  <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ total_users|default:0 }}</p>
+              </div>
+              <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                  <span class="material-icons text-blue-600 dark:text-blue-400">people</span>
+              </div>
+          </div>
+      </div>
+      <div class="bg-white dark:bg-gray-700 shadow rounded-xl p-4 border-l-4 border-green-500">
+          <div class="flex items-center justify-between">
+              <div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Proposals</p>
+                  <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ total_proposals|default:0 }}</p>
+              </div>
+              <div class="p-2 bg-green-100 dark:bg-green-900 rounded-full">
+                  <span class="material-icons text-green-600 dark:text-green-400">description</span>
+              </div>
+          </div>
+      </div>
+      <div class="bg-white dark:bg-gray-700 shadow rounded-xl p-4 border-l-4 border-purple-500">
+          <div class="flex items-center justify-between">
+              <div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Projects</p>
+                  <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ total_projects|default:0 }}</p>
+              </div>
+              <div class="p-2 bg-purple-100 dark:bg-purple-900 rounded-full">
+                  <span class="material-icons text-purple-600 dark:text-purple-400">folder</span>
+              </div>
+          </div>
+      </div>
+      <div class="bg-white dark:bg-gray-700 shadow rounded-xl p-4 border-l-4 border-orange-500">
+          <div class="flex items-center justify-between">
+              <div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Pending Ext.</p>
+                  <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ pending_extensions|default:0 }}</p>
+              </div>
+              <div class="p-2 bg-orange-100 dark:bg-orange-900 rounded-full">
+                  <span class="material-icons text-orange-600 dark:text-orange-400">schedule</span>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Simple Mode Notice (Only shows in Simple Mode) -->
+  <div class="hidden simple-mode-notice mb-8 bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+      <div class="flex items-center justify-center gap-3 mb-3">
+          <span class="material-icons text-green-600 text-3xl">check_circle</span>
+          <h2 class="text-xl font-bold text-green-800">Simple Mode Active</h2>
+      </div>
+      <p class="text-green-700 mb-4">Charts and complex features are hidden. You're viewing essential information only.</p>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+          <a href="{% url 'administrator_proposals_url' %}" class="bg-white border border-green-300 rounded-lg p-4 hover:bg-green-100 transition">
+              <span class="material-icons text-green-600 text-2xl mb-2">description</span>
+              <p class="font-medium text-gray-700">View Proposals</p>
+          </a>
+          <a href="{% url 'administrator_projects_url' %}" class="bg-white border border-green-300 rounded-lg p-4 hover:bg-green-100 transition">
+              <span class="material-icons text-green-600 text-2xl mb-2">folder</span>
+              <p class="font-medium text-gray-700">View Projects</p>
+          </a>
+          <a href="{% url 'administrator_users_url' %}" class="bg-white border border-green-300 rounded-lg p-4 hover:bg-green-100 transition">
+              <span class="material-icons text-green-600 text-2xl mb-2">people</span>
+              <p class="font-medium text-gray-700">View Users</p>
+          </a>
+          <a href="{% url 'administrator_extension_requests_url' %}" class="bg-white border border-green-300 rounded-lg p-4 hover:bg-green-100 transition">
+              <span class="material-icons text-green-600 text-2xl mb-2">schedule</span>
+              <p class="font-medium text-gray-700">Extensions</p>
+          </a>
+      </div>
+  </div>
+  
+  <!-- =========================== -->
+  <!-- 2. MAP SECTION (Hidden in Simple Mode) -->
+  <!-- =========================== -->
+  <div class="mb-8 border-b border-gray-100 pb-8 gis-map-section advanced-feature">
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+        <div>
+          <h2 class="text-lg font-semibold">GIS Dashboard — Projects (Biliran)</h2>
+          <p class="text-sm text-gray-600">
+            Click the map to find nearest projects. Toggle layers or view the legend below.
+          </p>
+          <div class="mt-2 text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200 inline-block advanced-feature">
+            <span class="text-blue-600">💡</span> <strong>Keyboard shortcuts:</strong> Arrow keys to pan, Enter to zoom in, Spacebar to zoom out!
+          </div>
+        </div>
+        <div class="flex gap-3 items-end advanced-feature">
+          <div>
+            <label class="text-sm block">Nearest count (N)</label>
+            <input id="nearestCount" type="number" min="1" max="50" value="5" class="border rounded px-2 py-1 w-20">
+          </div>
+          <button id="clearHighlights" class="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">Clear highlights</button>
+        </div>
+      </div>
+
+      <!-- Grid Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Map Column -->
+        <div class="lg:col-span-10">
+          <div id="map" style="height: 500px; width: 100%;" class="rounded-lg shadow-inner border border-gray-300 z-0"></div>
+        </div>
+
+        <!-- Sidebar (Legend + Nearest Tasks) -->
+        <div class="lg:col-span-2 space-y-4">
+          <!-- Legend -->
+          <div id="legend" class="bg-gray-50 p-4 rounded-lg border border-gray-300 shadow-sm">
+            <h3 class="font-semibold text-gray-700 mb-2">Map Legend</h3>
+            <ul class="space-y-1 text-sm text-gray-700">
+              <li class="flex items-center"><span class="legend-dot" style="background:#6b7280;"></span> New</li>
+              <li class="flex items-center"><span class="legend-dot" style="background:#3b82f6;"></span> Ongoing</li>
+              <li class="flex items-center"><span class="legend-dot" style="background:#10b981;"></span> Completed</li>
+              <li class="flex items-center"><span class="legend-dot" style="background:#ef4444;"></span> Terminated</li>
+              <li class="flex items-center"><span class="legend-dot" style="background:#d97706;"></span> Nearest Project Highlight</li>
+            </ul>
+          </div>
+
+          <!-- Nearest Projects -->
+          <div id="nearestResults" > 
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+  </div>
+
+  <!-- =========================== -->
+  <!-- 3. PROJECT & TASK CHARTS (Hidden in Simple Mode) -->
+  <!-- =========================== -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 border-b border-gray-100 pb-8 chart-section">
+      <!-- Project Status Chart -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+          <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <span class="material-icons text-blue-500">bar_chart</span>
+              Project Status Distribution
+          </h3>
+          <div class="relative h-64 w-full">
+              <canvas id="dashboardProjectChart"></canvas>
+          </div>
+      </div>
+
+      <!-- Task Completion Chart -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+          <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <span class="material-icons text-teal-500">task_alt</span>
+              Task Completion Overview
+          </h3>
+          <div class="relative h-64 w-full">
+              <canvas id="taskCompletionChart"></canvas>
+          </div>
+      </div>
+  </div>
+
+  <!-- =========================== -->
+  <!-- 3. USERS & PROPOSALS (Hidden in Simple Mode) -->
+  <!-- =========================== -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 border-b border-gray-100 pb-8 chart-section">
+      
+      <!-- User Roles Chart -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+          <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <span class="material-icons text-indigo-500">group</span>
+              User Demographics (Roles)
+          </h3>
+          <div class="relative h-64 w-full">
+              <canvas id="userRolesChart"></canvas>
+          </div>
+      </div>
+
+      <!-- Proposal Status Chart -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+          <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <span class="material-icons text-purple-500">description</span>
+              Proposal Status Overview
+          </h3>
+          <div class="relative h-64 w-full">
+              <canvas id="proposalStatusChart"></canvas>
+          </div>
+      </div>
+
+  </div>
+
+  <!-- =========================== -->
+  <!-- 4. TRENDS & ANALYTICS (Hidden in Simple Mode) -->
+  <!-- =========================== -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 border-b border-gray-100 pb-8 analytics-section">
+      
+      <!-- Proposals Over Time -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+          <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <span class="material-icons text-green-500">trending_up</span>
+              Proposals Over Time (Last 12 Months)
+          </h3>
+          <div class="relative h-64 w-full">
+              <canvas id="proposalsTrendChart"></canvas>
+          </div>
+      </div>
+
+      <!-- Extension Requests Status -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+          <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <span class="material-icons text-orange-500">schedule</span>
+              Extension Requests Status
+          </h3>
+          <div class="relative h-64 w-full">
+              <canvas id="extensionStatusChart"></canvas>
+          </div>
+      </div>
+
+  </div>
+
+  <!-- =========================== -->
+  <!-- 5. SUMMARY CARDS (Bottom)   -->
+  <!-- =========================== -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <!-- Equipment Value Allocated -->
+      <div class="bg-white shadow rounded-lg p-5 border-l-4 border-blue-500">
+          <h3 class="text-sm font-medium text-gray-500">Equipment Value Allocated</h3>
+          <p class="mt-2 text-2xl font-semibold text-gray-800">
+              ₱{{ total_budget|floatformat:0|intcomma }}
+          </p>
+      </div>
+
+      <!-- Equipment Value Delivered -->
+      <div class="bg-white shadow rounded-lg p-5 border-l-4 border-green-500">
+          <h3 class="text-sm font-medium text-gray-500">Equipment Value Delivered</h3>
+          <p class="mt-2 text-2xl font-semibold text-gray-800">
+              ₱{{ total_spent|floatformat:0|intcomma }}
+          </p>
+      </div>
+
+      <!-- Pending Delivery Value -->
+      <div class="bg-white shadow rounded-lg p-5 border-l-4 border-orange-500">
+          <h3 class="text-sm font-medium text-gray-500">Pending Delivery Value</h3>
+          <p class="mt-2 text-2xl font-semibold text-gray-800">
+              ₱{{ total_remaining|floatformat:0|intcomma }}
+          </p>
+      </div>
+
+      <!-- Delivery Rate -->
+      <div class="bg-white shadow rounded-lg p-5 border-l-4 border-purple-500">
+          <h3 class="text-sm font-medium text-gray-500">Equipment Delivery Rate</h3>
+          <p class="mt-2 text-2xl font-semibold text-gray-800">
+              {{ utilization_rate }}%
+          </p>
+      </div>
+  </div>
+
+  <!-- =========================== -->
+  <!-- 6. ACTIVITY FEED            -->
+  <!-- =========================== -->
+  <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-700 flex items-center gap-2">
+              <span class="material-icons text-blue-500">timeline</span>
+              Recent Activity
+          </h3>
+          <a href="{% url 'administrator_audit_logs_url' %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+              View All Logs →
+          </a>
+      </div>
+      <div class="space-y-3 max-h-80 overflow-y-auto">
+          {% if recent_activities %}
+              {% for activity in recent_activities %}
+              <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                  <div class="flex-shrink-0">
+                      {% if 'approved' in activity.action|lower %}
+                          <span class="material-icons text-green-500 text-lg">check_circle</span>
+                      {% elif 'declined' in activity.action|lower or 'rejected' in activity.action|lower or 'deleted' in activity.action|lower %}
+                          <span class="material-icons text-red-500 text-lg">cancel</span>
+                      {% elif 'created' in activity.action|lower or 'added' in activity.action|lower %}
+                          <span class="material-icons text-blue-500 text-lg">add_circle</span>
+                      {% elif 'updated' in activity.action|lower or 'edited' in activity.action|lower %}
+                          <span class="material-icons text-yellow-500 text-lg">edit</span>
+                      {% elif 'login' in activity.action|lower %}
+                          <span class="material-icons text-purple-500 text-lg">login</span>
+                      {% else %}
+                          <span class="material-icons text-gray-500 text-lg">info</span>
+                      {% endif %}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                      <p class="text-sm text-gray-800">{{ activity.action }}</p>
+                      <div class="flex items-center gap-2 mt-1">
+                          <span class="text-xs text-gray-500">{{ activity.user.first_name }} {{ activity.user.last_name }}</span>
+                          <span class="text-xs text-gray-400">•</span>
+                          <span class="text-xs text-gray-500">{{ activity.timestamp|timesince }} ago</span>
+                      </div>
+                  </div>
+              </div>
+              {% endfor %}
+          {% else %}
+              <div class="text-center py-8 text-gray-500">
+                  <span class="material-icons text-4xl mb-2">history</span>
+                  <p class="text-sm">No recent activity</p>
+              </div>
+          {% endif %}
+      </div>
+  </div>
+
+</div>
+
+<!-- Leaflet JS logic -->
+<script>
+// FIX: Retrieve data as strings first, then parse. Prevents crashes if empty.
+const projectsRaw = "{{ projects_json|escapejs }}";
+const PROJECTS = projectsRaw ? JSON.parse(projectsRaw) : [];
+
+const BILIRAN_CENTER = [11.55, 124.47];
+const map = L.map('map', { preferCanvas: true }).setView(BILIRAN_CENTER, 11.5);
+
+// Base layers
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri'
+});
+
+// Layers and markers - using project statuses
+const layers = { new: L.markerClusterGroup(), ongoing: L.markerClusterGroup(), completed: L.markerClusterGroup(), terminated: L.markerClusterGroup() };
+const kdPoints = [];
+const statusColors = { new: '#6b7280', ongoing: '#3b82f6', completed: '#10b981', terminated: '#ef4444' };
+
+function coloredIcon(color) {
+  return L.divIcon({
+    html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};
+            box-shadow:0 0 6px ${color};border:2px solid #fff;"></div>`,
+    className: '', iconSize: [22,22], iconAnchor: [11,11]
+  });
+}
+
+PROJECTS.forEach(project => {
+  if (project.latitude == null || project.longitude == null) return;
+  const lat = parseFloat(project.latitude), lng = parseFloat(project.longitude);
+  const status = project.status || 'new';
+  const marker = L.marker([lat, lng], { icon: coloredIcon(statusColors[status] || '#374151') });
+  const fundsFormatted = project.funds ? '₱' + project.funds.toLocaleString() : 'N/A';
+  const popup = `
+    <div style="min-width:220px;">
+      <strong>${escapeHtml(project.title)}</strong><br/>
+      <small class="text-gray-500">${escapeHtml(project.municipality)}, ${escapeHtml(project.province)}</small><br/>
+      <div style="margin-top:.3rem;">${escapeHtml(project.description || '').slice(0,200)}</div>
+      <div style="margin-top:.4rem;font-size:.9rem;color:#555;">
+        Beneficiary: ${escapeHtml(project.beneficiary || 'N/A')}<br/>
+        Proponent: ${escapeHtml(project.proponent || 'N/A')}<br/>
+        Funds: ${fundsFormatted}
+      </div>
+    </div>`;
+  marker.bindPopup(popup);
+  if (layers[status]) {
+    layers[status].addLayer(marker);
+  } else {
+    layers.new.addLayer(marker);
+  }
+  kdPoints.push({ point: [lat, lng], data: project, markerRef: marker });
+});
+
+const baseMaps = { "OpenStreetMap": osm, "ESRI Satellite": esriSat };
+const overlayMaps = { "New": layers.new, "Ongoing": layers.ongoing, "Completed": layers.completed, "Terminated": layers.terminated };
+L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+Object.values(layers).forEach(g => map.addLayer(g));
+
+// KD-tree + Haversine functions
+function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
+  const toRad = v => v * Math.PI / 180, R = 6371000;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function buildKDTree(points, depth=0) {
+  if (!points.length) return null;
+  const axis = depth % 2; 
+  points.sort((a,b)=>a.point[axis]-b.point[axis]);
+  const median = Math.floor(points.length/2);
+  return { point: points[median].point, data: points[median].data, markerRef: points[median].markerRef, axis,
+           left: buildKDTree(points.slice(0, median), depth+1),
+           right: buildKDTree(points.slice(median+1), depth+1) };
+}
+function nearestNeighbors(root, target, N) {
+  const best = [];
+  
+  function pushBest(item) {
+    best.push(item);
+    best.sort((a, b) => a.dist - b.dist); // Sort ASCENDING (closest first)
+    if (best.length > N) best.pop(); // Remove the last (furthest)
+  }
+  
+  function getMaxDist() {
+    return best.length > 0 ? best[best.length - 1].dist : Infinity;
+  }
+  
+  function recurse(node) {
+    if (!node) return;
+    
+    const d = haversineDistanceMeters(target[0], target[1], node.point[0], node.point[1]);
+    
+    if (best.length < N || d < getMaxDist()) {
+      pushBest({ dist: d, node });
+    }
+    
+    const diff = target[node.axis] - node.point[node.axis];
+    const first = diff <= 0 ? node.left : node.right;
+    const second = diff <= 0 ? node.right : node.left;
+    
+    recurse(first);
+    
+    // Only explore the other branch if it could contain closer points
+    if (best.length < N || Math.abs(diff) * 111000 < getMaxDist()) { // 111km per degree approximation
+      recurse(second);
+    }
+  }
+  
+  recurse(root);
+  return best; // Already sorted ascending (closest first)
+}
+const kdTree=buildKDTree(kdPoints.slice()); // Use slice() to avoid mutating original array
+
+// Highlight Nearest
+let highlightLayer=L.layerGroup().addTo(map);
+function clearHighlights(){highlightLayer.clearLayers();document.getElementById('nearestResults').innerHTML='';}
+document.getElementById('clearHighlights').addEventListener('click',clearHighlights);
+
+// Center Biliran control (small pin inside map)
+// Biliran Province bounds (SW corner to NE corner)
+const BILIRAN_BOUNDS = L.latLngBounds(
+  [11.4700, 124.3400],  // Southwest corner
+  [11.7200, 124.6200]   // Northeast corner
+);
+
+const CenterControl = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function(map) {
+    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    const button = L.DomUtil.create('a', '', container);
+    button.href = '#';
+    button.title = 'Center on Biliran Province';
+    button.innerHTML = '<span style="font-size:18px;">📍</span>';
+    button.style.cssText = 'display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:#fff;cursor:pointer;';
+    L.DomEvent.disableClickPropagation(button);
+    L.DomEvent.on(button, 'click', function(e) {
+      L.DomEvent.preventDefault(e);
+      map.fitBounds(BILIRAN_BOUNDS, { padding: [20, 20] });
+    });
+    return container;
+  }
+});
+map.addControl(new CenterControl());
+
+function highlightNearest(list){
+  clearHighlights();const results=[];
+  list.forEach((item,idx)=>{
+    const p=item.node.data;
+    L.circle([p.latitude,p.longitude],{radius:Math.max(40,Math.min(1500,item.dist*0.25)),color:idx===0?'#d97706':'#2563eb',weight:2,fillOpacity:0.08}).addTo(highlightLayer);
+    const numberedIcon=L.divIcon({html:`<div style="background:${idx===0?'#d97706':'#2563eb'};color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">${idx+1}</div>`,className:''});
+    const numberedMarker = L.marker([p.latitude,p.longitude],{icon:numberedIcon}).addTo(highlightLayer);
+    // Click on numbered marker opens the original project marker popup
+    numberedMarker.on('click', function() {
+      item.node.markerRef.openPopup();
+    });
+    results.push({rank:idx+1,title:p.title,municipality:p.municipality,distance_m:Math.round(item.dist)});
+  });
+  // No auto-popup - user must click on the marker to see details
+}
+
+map.on('click',e=>{
+  const N=parseInt(document.getElementById('nearestCount').value,10)||5;
+  const nearest=nearestNeighbors(kdTree,[e.latlng.lat,e.latlng.lng],N);
+  highlightNearest(nearest);
+});
+(function fitMap(){
+  const pts=kdPoints.map(p=>p.point);
+  if(pts.length)map.fitBounds(L.latLngBounds(pts).pad(0.15));
+  else map.setView(BILIRAN_CENTER,11.5);
+})();
+
+// Arrow key navigation for map
+const PAN_DISTANCE = 100; // pixels to pan per key press
+
+document.addEventListener('keydown', function(e) {
+    // Only handle arrow keys when map is focused or when no input/textarea is focused
+    const activeElement = document.activeElement;
+    const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.contentEditable === 'true';
+    
+    if (!isInputFocused) {
+        switch(e.key) {
+            case 'ArrowUp':
+                e.preventDefault();
+                map.panBy([0, -PAN_DISTANCE]);
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                map.panBy([0, PAN_DISTANCE]);
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                map.panBy([-PAN_DISTANCE, 0]);
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                map.panBy([PAN_DISTANCE, 0]);
+                break;
+            case 'Enter':
+                e.preventDefault();
+                map.zoomIn();
+                break;
+            case ' ':
+                e.preventDefault();
+                map.zoomOut();
+                break;
+        }
+    }
+});
+
+// Focus map when clicked to enable keyboard navigation
+document.getElementById('map').addEventListener('click', function() {
+    this.focus();
+});
+
+function escapeHtml(u){if(!u)return '';return String(u).replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));}
+</script>
+
+<!-- CHART.JS LOGIC -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // ==========================================
+        // DATA PARSING
+        // ==========================================
+        const labelsRaw = "{{ project_status_labels|escapejs }}";
+        const labelsData = labelsRaw ? JSON.parse(labelsRaw) : [];
+
+        const valuesRaw = "{{ project_status_values|escapejs }}";
+        const valuesData = valuesRaw ? JSON.parse(valuesRaw) : [];
+
+    const spentVal = parseFloat("{{ total_spent|floatformat:2|default:'0' }}");
+    const remainingVal = parseFloat("{{ total_remaining|floatformat:2|default:'0' }}");
+
+    // DEBUG: print raw and parsed dashboard numbers to console for verification
+    try {
+      console.debug('[dashboard] raw project_status_labels:', "{{ project_status_labels|escapejs }}");
+      console.debug('[dashboard] parsed labelsData:', labelsData);
+      console.debug('[dashboard] raw project_status_values:', "{{ project_status_values|escapejs }}");
+      console.debug('[dashboard] parsed valuesData:', valuesData);
+      console.debug('[dashboard] total_spent (raw):', "{{ total_spent|floatformat:2|default:'0' }}", ' total_spent(parsed):', spentVal);
+      console.debug('[dashboard] total_remaining (raw):', "{{ total_remaining|floatformat:2|default:'0' }}", ' total_remaining(parsed):', remainingVal);
+    } catch (e) { console.warn('Dashboard debug log failed', e); }
+
+        // User Roles Data
+        const userRolesLabels = JSON.parse("{{ user_role_labels|escapejs }}" || "[]");
+        const userRolesValues = JSON.parse("{{ user_role_values|escapejs }}" || "[]");
+
+        // Proposal Status Data
+        const propStatusLabels = JSON.parse("{{ proposal_status_labels|escapejs }}" || "[]");
+        const propStatusValues = JSON.parse("{{ proposal_status_values|escapejs }}" || "[]");
+
+        // ==========================================
+        // CHART 1: PROJECT STATUS (Bar)
+        // ==========================================
+        const ctxProj = document.getElementById('dashboardProjectChart').getContext('2d');
+        new Chart(ctxProj, {
+            type: 'bar',
+            data: {
+                labels: labelsData,
+                datasets: [{
+                    label: 'Projects',
+                    data: valuesData,
+                    backgroundColor: ['#F59E0B', '#3B82F6', '#10B981', '#EF4444'],
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // ==========================================
+        // CHART 2: TASK COMPLETION (Doughnut)
+        // ==========================================
+        const taskPending = parseInt("{{ task_pending|default:0 }}");
+        const taskInProgress = parseInt("{{ task_in_progress|default:0 }}");
+        const taskCompleted = parseInt("{{ task_completed|default:0 }}");
+        const taskOverdue = parseInt("{{ task_overdue|default:0 }}");
+        
+        const ctxTask = document.getElementById('taskCompletionChart').getContext('2d');
+        new Chart(ctxTask, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pending', 'In Progress', 'Completed', 'Overdue'],
+                datasets: [{
+                    data: [taskPending, taskInProgress, taskCompleted, taskOverdue],
+                    backgroundColor: ['#FCD34D', '#3B82F6', '#10B981', '#EF4444'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // ==========================================
+        // CHART 3: USER ROLES (Doughnut)
+        // ==========================================
+        const ctxUser = document.getElementById('userRolesChart').getContext('2d');
+        new Chart(ctxUser, {
+            type: 'doughnut',
+            data: {
+                labels: userRolesLabels,
+                datasets: [{
+                    data: userRolesValues,
+                    backgroundColor: ['#6366F1', '#EC4899', '#8B5CF6', '#14B8A6'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // ==========================================
+        // CHART 4: PROPOSAL STATUS (Pie)
+        // ==========================================
+        const ctxProp = document.getElementById('proposalStatusChart').getContext('2d');
+        new Chart(ctxProp, {
+            type: 'pie',
+            data: {
+                labels: propStatusLabels,
+                datasets: [{
+                    data: propStatusValues,
+                    backgroundColor: ['#FCD34D', '#34D399', '#F87171', '#60A5FA', '#9CA3AF'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // ==========================================
+        // CHART 5: PROPOSALS TREND (Line)
+        // ==========================================
+        const proposalsTrendLabels = JSON.parse("{{ proposals_month_labels|escapejs }}" || "[]");
+        const proposalsTrendValues = JSON.parse("{{ proposals_month_values|escapejs }}" || "[]");
+        
+        const ctxPropTrend = document.getElementById('proposalsTrendChart');
+        if (ctxPropTrend) {
+            new Chart(ctxPropTrend.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: proposalsTrendLabels,
+                    datasets: [{
+                        label: 'Proposals',
+                        data: proposalsTrendValues,
+                        borderColor: '#10B981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // CHART 6: EXTENSION REQUESTS STATUS (Doughnut)
+        // ==========================================
+        const extStatusLabels = JSON.parse("{{ extension_status_labels|escapejs }}" || "[]");
+        const extStatusValues = JSON.parse("{{ extension_status_values|escapejs }}" || "[]");
+        
+        const ctxExtStatus = document.getElementById('extensionStatusChart');
+        if (ctxExtStatus) {
+            new Chart(ctxExtStatus.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: extStatusLabels,
+                    datasets: [{
+                        data: extStatusValues,
+                        backgroundColor: ['#FBBF24', '#10B981', '#EF4444'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+    });
+</script>
+
+<style>
+  @media (max-width: 1024px) {
+    #map { height: 420px !important; }
+  }
+  .legend-dot {
+    display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:6px;
+  }
+  .legend-line {
+    display:inline-block;width:18px;height:0;border-top:2px solid;margin-right:6px;
+  }
+</style>
+{% endblock %}

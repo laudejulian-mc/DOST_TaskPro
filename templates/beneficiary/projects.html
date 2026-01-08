@@ -1,0 +1,280 @@
+{% extends "beneficiary/base.html" %}
+{% load static %}
+
+{% block title %}Projects{% endblock %}
+{% block nav-projects %}active-nav{% endblock %}
+{% block page-title %}Projects{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<div class="container mt-2" x-data="{ openAdd: false, openEdit: false, editProject: {} }">
+
+    <!-- Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white {% if message.tags == 'success' %}bg-green-500{% elif message.tags == 'error' %}bg-red-500{% else %}bg-blue-500{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Add Project Button
+    <div class="flex justify-end mb-4">
+        <button @click="openAdd = true" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg shadow">
+            + Add Project
+        </button>
+    </div> -->
+
+    <!-- Projects Table -->
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg p-4">
+        <table id="projectsTable" class="min-w-full text-sm text-left text-gray-600">
+            <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Project Code</th>
+                    <th class="px-4 py-2">Title</th>
+                    <th class="px-4 py-2">Proposal</th>
+                    <th class="px-4 py-2">Proponent</th>
+                    <th class="px-4 py-2">Beneficiary</th>
+                    <th class="px-4 py-2">Project Start & End Date</th>
+                    <th class="px-4 py-2">Budget</th>
+                    <th class="px-4 py-2">Approved Budget</th>
+                    <th class="px-4 py-2">Status</th>
+                    <th class="px-4 py-2">Action</th>
+                    <!-- <th class="px-4 py-2 text-center">Actions</th> -->
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in projects %}
+                <tr>
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2">{{ project.project_code }}</td>
+                    <td class="px-4 py-2">{{ project.project_title }}</td>
+                    <td class="px-4 py-2">
+                        {% if project.proposal %}
+                            {{ project.proposal.title }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2">
+                        {% if project.proposal and project.proposal.processed_by %}
+                            {{ project.proposal.processed_by.get_full_name }} - {{ project.proposal.processed_by.address }} 
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td class="px-4 py-2">
+                        {% if project.proposal and project.proposal.beneficiary %}
+                            {{ project.proposal.beneficiary.get_full_name }} - {{ project.proposal.beneficiary.address }} 
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td class="px-4 py-2">
+                        {% if project.start_date and project.end_date %}
+                            {{ project.start_date|date:"M d, Y" }} - {{ project.end_date|date:"M d, Y" }}
+                        {% elif project.start_date %}
+                            {{ project.start_date|date:"M d, Y" }} - -
+                        {% elif project.end_date %}
+                            - - {{ project.end_date|date:"M d, Y" }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td class="px-4 py-2">
+                        {% if project.budget %}
+                            {{ project.budget.fund_source }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td class="px-4 py-2">{{ project.approved_budget }}</td>
+                    <td class="px-4 py-2 text-center">
+                        {% if project.status == 'proposal' %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800 font-medium">Proposal</span>
+                        {% elif project.status == 'ongoing' %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-blue-100 text-blue-800 font-medium">Ongoing</span>
+                        {% elif project.status == 'completed' %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-green-100 text-green-800 font-medium">Completed</span>
+                        {% elif project.status == 'terminated' %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-red-100 text-red-800 font-medium">Terminated</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        <div class="flex justify-center gap-2">
+                            {% if project.status != 'completed' %}
+                                <form method="POST" action="{% url 'mark_project_completed' project.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                        class="px-2 py-1 text-xs text-white bg-blue-500 rounded hover:bg-blue-600">
+                                        Mark as Completed
+                                    </button>
+                                </form>
+                            {% else %}
+                                <span class="px-2 py-1 text-xs text-gray-500">N/A</span>
+                            {% endif %}
+                        </div>
+                    </td>
+
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add Project Modal -->
+    <div x-show="openAdd" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto" x-cloak>
+        <div @click.away="openAdd = false" class="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg mt-10 mb-10 overflow-y-auto max-h-[90vh]">
+            <h2 class="text-lg font-semibold mb-4">Add Project</h2>
+            <form method="POST" action="{% url 'administrator_projects_add_url' %}" enctype="multipart/form-data" class="space-y-3">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-sm font-medium">Project Title</label>
+                    <input type="text" name="project_title" class="w-full border rounded-lg px-3 py-2" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Description</label>
+                    <textarea name="project_description" class="w-full border rounded-lg px-3 py-2"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Approved Budget</label>
+                        <input type="number" step="0.01" name="approved_budget" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Budget</label>
+                        <select name="budget" class="w-full border rounded-lg px-3 py-2">
+                            <option value="">Select Budget</option>
+                            {% for budget in budgets %}
+                            <option value="{{ budget.id }}">{{ budget.fund_source }} ({{ budget.fiscal_year }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Supporting Documents</label>
+                    <input type="file" name="supporting_documents" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Start Date</label>
+                        <input type="date" name="start_date" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">End Date</label>
+                        <input type="date" name="end_date" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" @click="openAdd = false" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Project Modal -->
+    <div x-show="openEdit" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto" x-cloak>
+        <div @click.away="openEdit = false" class="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg mt-10 mb-10 overflow-y-auto max-h-[90vh]">
+            <h2 class="text-lg font-semibold mb-4">Edit Project</h2>
+            <form method="POST" x-bind:action="`/projects/update/${editProject.id}/`" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-sm font-medium">Status</label>
+                    <select name="status" x-model="editProject.status" class="w-full border rounded-lg px-3 py-2">
+                        <option value="proposal" :selected="editProject.status=='proposal'">Proposal</option>
+                        <option value="ongoing" :selected="editProject.status=='ongoing'">Ongoing</option>
+                        <option value="completed" :selected="editProject.status=='completed'">Completed</option>
+                        <option value="terminated" :selected="editProject.status=='terminated'">Terminated</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Project Title</label>
+                    <input type="text" name="project_title" x-model="editProject.project_title" class="w-full border rounded-lg px-3 py-2" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Description</label>
+                    <textarea name="project_description" x-model="editProject.project_description" class="w-full border rounded-lg px-3 py-2"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Approved Budget</label>
+                        <input type="number" step="0.01" name="approved_budget" x-model="editProject.approved_budget" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Budget</label>
+                        <select name="budget" x-model="editProject.budget" class="w-full border rounded-lg px-3 py-2">
+                            <option value="">Select Budget</option>
+                            {% for budget in budgets %}
+                            <option value="{{ budget.id }}">{{ budget.fund_source }} ({{ budget.fiscal_year }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Supporting Documents</label>
+                    <input type="file" name="supporting_documents" class="w-full border rounded-lg px-3 py-2">
+                    <template x-if="editProject.supporting_documents_url">
+                        <a :href="editProject.supporting_documents_url" target="_blank" class="text-blue-600 hover:underline text-xs mt-1 block">View Current Document</a>
+                    </template>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium">Start Date</label>
+                        <input type="date" name="start_date" x-model="editProject.start_date" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">End Date</label>
+                        <input type="date" name="end_date" x-model="editProject.end_date" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" @click="openEdit = false" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    $(document).ready(function () {
+        $('#projectsTable').DataTable();
+
+        // Edit button click
+        document.querySelectorAll('.editBtn').forEach(button => {
+            button.addEventListener('click', function () {
+                const root = document.querySelector('[x-data]');
+                const alpine = Alpine.$data(root);
+
+                alpine.editProject = {
+                    id: this.dataset.id,
+                    project_title: this.dataset.title,
+                    project_description: this.dataset.description,
+                    approved_budget: this.dataset.approved_budget,
+                    budget: this.dataset.budget,
+                    status: this.dataset.status,
+                    supporting_documents_url: this.dataset.supporting_documentsUrl,
+                    start_date: this.dataset.start_date,
+                    end_date: this.dataset.end_date,
+                };
+
+                alpine.openEdit = true;
+            });
+        });
+    });
+</script>
+
+{% endblock %}

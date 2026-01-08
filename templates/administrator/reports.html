@@ -1,0 +1,1486 @@
+{% extends "administrator/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Reports{% endblock %}
+{% block nav-reports %}active-nav{% endblock %}
+{% block page-title %}Reports{% endblock %}
+
+{% block content %}
+<style>[x-cloak] { display: none !important; }</style>
+
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">Overview Reports</h2>
+    <div class="flex flex-wrap gap-2">
+        <!-- Excel Export Dropdown (Pure JS) -->
+        <div class="relative">
+            <button id="excelDropdownBtn" 
+                    class="px-4 py-2 bg-green-600 text-white font-semibold rounded hover:bg-green-700 transition flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export Excel
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <div id="excelDropdownMenu" 
+                 class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border z-50">
+                <a href="{% url 'export_master_report_excel' %}" 
+                   class="block px-4 py-2 text-white bg-green-600 hover:bg-green-700 font-semibold transition rounded-t-lg">
+                    📋 Master Report (All Data)
+                </a>
+                <hr class="border-gray-200">
+                <a href="{% url 'export_projects_excel' %}" 
+                   class="block px-4 py-2 text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                    📊 Projects
+                </a>
+                <a href="{% url 'export_proposals_excel' %}" 
+                   class="block px-4 py-2 text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                    📝 Proposals
+                </a>
+                <a href="{% url 'export_budgets_excel' %}" 
+                   class="block px-4 py-2 text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                    💰 Budgets
+                </a>
+                <a href="{% url 'export_tasks_excel' %}" 
+                   class="block px-4 py-2 text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                    ✅ Tasks
+                </a>
+            </div>
+        </div>
+        
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const btn = document.getElementById('excelDropdownBtn');
+                const menu = document.getElementById('excelDropdownMenu');
+                
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    menu.classList.toggle('hidden');
+                });
+                
+                document.addEventListener('click', function(e) {
+                    if (!btn.contains(e.target) && !menu.contains(e.target)) {
+                        menu.classList.add('hidden');
+                    }
+                });
+            });
+        </script>
+        
+        <!-- Print Button -->
+        <button onclick="window.print()" 
+                class="px-4 py-2 bg-gray-600 text-white font-semibold rounded hover:bg-gray-700 transition flex items-center gap-2 no-print">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print
+        </button>
+        
+        <!-- PDF Export -->
+        <button type="button" id="openPdfPreviewBtn"
+           class="px-4 py-2 bg-red-600 text-white font-semibold rounded hover:bg-red-700 transition flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export PDF
+        </button>
+    </div>
+</div>
+
+<!-- PDF Export Preview Modal -->
+<div x-data="pdfExportManager()" x-init="init()" data-pdf-url="{% url 'export_full_report_pdf' %}">
+    <div x-show="showPdfPreview" x-transition
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto" x-cloak>
+        <div @click.away="showPdfPreview = false"
+             class="bg-white dark:bg-gray-800 w-full max-w-2xl p-6 rounded-lg shadow-lg m-4">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800 dark:text-white">Export PDF Report</h2>
+                <button @click="showPdfPreview = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <p class="text-gray-600 dark:text-gray-300 mb-4">Select which sections to include in your exported PDF report:</p>
+            
+            <!-- Quick Actions -->
+            <div class="flex gap-2 mb-4">
+                <button @click="selectAll()" class="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800">
+                    Select All
+                </button>
+                <button @click="deselectAll()" class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+                    Deselect All
+                </button>
+            </div>
+            
+            <!-- Section Checkboxes -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <!-- Summary Statistics -->
+                <label class="flex items-start gap-3 p-4 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                       :class="{ 'border-blue-500 bg-blue-50 dark:bg-blue-900/30': sections.summary }">
+                    <input type="checkbox" x-model="sections.summary" class="mt-1 w-5 h-5 text-blue-600 rounded">
+                    <div>
+                        <div class="font-semibold text-gray-800 dark:text-white">Summary Statistics</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Key metrics, equipment status, and task overview</div>
+                    </div>
+                </label>
+                
+                <!-- Equipment Allocations -->
+                <label class="flex items-start gap-3 p-4 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                       :class="{ 'border-purple-500 bg-purple-50 dark:bg-purple-900/30': sections.equipment }">
+                    <input type="checkbox" x-model="sections.equipment" class="mt-1 w-5 h-5 text-purple-600 rounded">
+                    <div>
+                        <div class="font-semibold text-gray-800 dark:text-white">Equipment Allocations</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Detailed list of equipment allocated to projects</div>
+                    </div>
+                </label>
+                
+                <!-- Projects List -->
+                <label class="flex items-start gap-3 p-4 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                       :class="{ 'border-green-500 bg-green-50 dark:bg-green-900/30': sections.projects }">
+                    <input type="checkbox" x-model="sections.projects" class="mt-1 w-5 h-5 text-green-600 rounded">
+                    <div>
+                        <div class="font-semibold text-gray-800 dark:text-white">Complete Projects List</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">All projects with status, funds, and dates</div>
+                    </div>
+                </label>
+                
+                <!-- Proposals List -->
+                <label class="flex items-start gap-3 p-4 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                       :class="{ 'border-teal-500 bg-teal-50 dark:bg-teal-900/30': sections.proposals }">
+                    <input type="checkbox" x-model="sections.proposals" class="mt-1 w-5 h-5 text-teal-600 rounded">
+                    <div>
+                        <div class="font-semibold text-gray-800 dark:text-white">Complete Proposals List</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">All proposals with amounts and submission dates</div>
+                    </div>
+                </label>
+                
+                <!-- Charts -->
+                <label class="flex items-start gap-3 p-4 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                       :class="{ 'border-orange-500 bg-orange-50 dark:bg-orange-900/30': sections.charts }">
+                    <input type="checkbox" x-model="sections.charts" class="mt-1 w-5 h-5 text-orange-600 rounded">
+                    <div>
+                        <div class="font-semibold text-gray-800 dark:text-white">Visual Charts</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Budget, status, municipality, and user role charts</div>
+                    </div>
+                </label>
+                
+                <!-- Signatory -->
+                <label class="flex items-start gap-3 p-4 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                       :class="{ 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30': sections.signatory }">
+                    <input type="checkbox" x-model="sections.signatory" class="mt-1 w-5 h-5 text-indigo-600 rounded">
+                    <div>
+                        <div class="font-semibold text-gray-800 dark:text-white">Signatory Section</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Prepared by signature line with date</div>
+                    </div>
+                </label>
+                
+                <!-- E-Signature -->
+                <label class="flex items-start gap-3 p-4 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                       :class="{ 'border-green-500 bg-green-50 dark:bg-green-900/30': sections.esignature }">
+                    <input type="checkbox" x-model="sections.esignature" class="mt-1 w-5 h-5 text-green-600 rounded">
+                    <div class="flex-grow">
+                        <div class="font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                            <span class="material-icons text-sm text-green-600">draw</span>
+                            Include E-Signature
+                        </div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Add your digital signature image to the report</div>
+                        {% if user_signature %}
+                        <div class="mt-2 flex items-center gap-2">
+                            {% if user_signature.signature_image %}
+                            <img src="{{ user_signature.signature_image.url }}" alt="Your signature" class="h-8 border rounded">
+                            {% elif user_signature.signature_data %}
+                            <img src="{{ user_signature.signature_data }}" alt="Your signature" class="h-8 border rounded">
+                            {% endif %}
+                            <span class="text-xs text-green-600">✓ Signature ready</span>
+                        </div>
+                        {% else %}
+                        <div class="mt-2">
+                            <span class="text-xs text-amber-600 flex items-center gap-1">
+                                <span class="material-icons text-xs">warning</span>
+                                No signature set. <a href="{% url 'administrator_settings_url' %}" class="underline hover:text-amber-700">Set up in Settings</a>
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </label>
+            </div>
+            
+            <!-- Sorting Options -->
+            <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
+                <h3 class="font-semibold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
+                    <span class="material-icons text-sm">sort</span>
+                    Sort Results By
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Projects Sort By</label>
+                        <select x-model="sortOptions.projects" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                            <option value="title">Project Title (A-Z)</option>
+                            <option value="title_desc">Project Title (Z-A)</option>
+                            <option value="municipality">Municipality (A-Z)</option>
+                            <option value="municipality_desc">Municipality (Z-A)</option>
+                            <option value="status">Status</option>
+                            <option value="funds">Funds (Highest First)</option>
+                            <option value="funds_asc">Funds (Lowest First)</option>
+                            <option value="date">Date (Newest First)</option>
+                            <option value="date_asc">Date (Oldest First)</option>
+                            <option value="proponent">Proponent (A-Z)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Proposals Sort By</label>
+                        <select x-model="sortOptions.proposals" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                            <option value="title">Title (A-Z)</option>
+                            <option value="title_desc">Title (Z-A)</option>
+                            <option value="municipality">Municipality (A-Z)</option>
+                            <option value="municipality_desc">Municipality (Z-A)</option>
+                            <option value="status">Status</option>
+                            <option value="amount">Amount (Highest First)</option>
+                            <option value="amount_asc">Amount (Lowest First)</option>
+                            <option value="date">Date (Newest First)</option>
+                            <option value="date_asc">Date (Oldest First)</option>
+                            <option value="proponent">Proponent (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Preview Summary -->
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                <h3 class="font-semibold text-gray-700 dark:text-white mb-2">Export Preview</h3>
+                <div class="text-sm text-gray-600 dark:text-gray-300">
+                    <span x-text="Object.values(sections).filter(v => v).length"></span> section(s) selected for export
+                </div>
+                <ul class="text-sm text-gray-500 dark:text-gray-400 mt-2 space-y-1">
+                    <li x-show="sections.summary">✓ Summary Statistics</li>
+                    <li x-show="sections.equipment">✓ Equipment Allocations</li>
+                    <li x-show="sections.projects">✓ Projects List</li>
+                    <li x-show="sections.proposals">✓ Proposals List</li>
+                    <li x-show="sections.charts">✓ Visual Charts</li>
+                    <li x-show="sections.signatory">✓ Signatory Section</li>
+                </ul>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex justify-end gap-3">
+                <button @click="showPdfPreview = false" 
+                        class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition">
+                    Cancel
+                </button>
+                <button @click="exportPdf()" 
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2"
+                        :disabled="Object.values(sections).every(v => !v)"
+                        :class="{ 'opacity-50 cursor-not-allowed': Object.values(sections).every(v => !v) }">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Generate PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alpine.js for collapsible filters -->
+<div x-data="{ showFilters: false }" class="mb-8">
+    <!-- Filter Toggle Button -->
+    <button @click="showFilters = !showFilters" 
+            class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition">
+        <svg x-show="!showFilters" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+        </svg>
+        <svg x-show="showFilters" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" x-cloak>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span x-text="showFilters ? 'Hide Filters' : 'Show Filters'"></span>
+    </button>
+
+    <!-- Filter Form -->
+    <div x-show="showFilters" x-transition class="bg-white p-4 rounded-lg shadow mt-4" x-cloak>
+        <h3 class="text-lg font-semibold mb-4">Filter Reports</h3>
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Year Filter -->
+        <div>
+            <label for="year" class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <select name="year" id="year" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Years</option>
+                {% for year in available_years %}
+                <option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Municipality Filter -->
+        <div>
+            <label for="municipality" class="block text-sm font-medium text-gray-700 mb-1">Municipality</label>
+            <select name="municipality" id="municipality" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Municipalities</option>
+                {% for mun in available_municipalities %}
+                <option value="{{ mun }}" {% if selected_municipality == mun %}selected{% endif %}>{{ mun }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Start Date Filter -->
+        <div>
+            <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input type="date" name="start_date" id="start_date" value="{{ start_date }}" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- End Date Filter -->
+        <div>
+            <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <input type="date" name="end_date" id="end_date" value="{{ end_date }}" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Status Filter -->
+        <div>
+            <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select name="status" id="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Statuses</option>
+                {% for status in available_statuses %}
+                <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Filter Actions -->
+        <div class="md:col-span-2 lg:col-span-5 flex gap-2">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition">
+                Apply Filters
+            </button>
+            <a href="{% url 'administrator_reports_url' %}" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded hover:bg-gray-600 transition">
+                Clear Filters
+            </a>
+        </div>
+    </form>
+    </div>
+</div>
+<!-- End of Filter Section -->
+
+<!-- Summary Statistics Cards (Equipment-focused) - Always Visible -->
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-lg shadow">
+        <div class="text-2xl font-bold">₱{{ total_budget|intcomma }}</div>
+        <div class="text-sm opacity-90">Equipment Value Allocated</div>
+    </div>
+    <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-lg shadow">
+        <div class="text-2xl font-bold">₱{{ total_spent|intcomma }}</div>
+        <div class="text-sm opacity-90">Equipment Value Delivered</div>
+    </div>
+    <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 rounded-lg shadow">
+        <div class="text-2xl font-bold">{{ utilization_rate }}%</div>
+        <div class="text-sm opacity-90">Utilization Rate</div>
+    </div>
+</div>
+
+<!-- Simple Mode Notice for Reports -->
+<div class="hidden simple-mode-notice mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+    <p class="text-blue-700"><span class="material-icons text-sm align-middle">info</span> Charts are hidden in Simple Mode. Use the Export buttons above to download reports.</p>
+</div>
+
+<!-- Row 1: 3 Doughnut Charts - Equal sizing (Hidden in Simple Mode) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 chart-section">
+    <!-- Proposal Status -->
+    <div class="p-4 bg-white shadow rounded-lg">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700 text-center">Proposal Status</h3>
+        <div class="flex justify-center items-center" style="height: 180px;">
+            <canvas id="proposalPieChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Project Status Distribution -->
+    <div class="p-4 bg-white shadow rounded-lg">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700 text-center">Project Status</h3>
+        <div class="flex justify-center items-center" style="height: 180px;">
+            <canvas id="projectStatusChart"></canvas>
+        </div>
+    </div>
+
+    <!-- User Role Distribution -->
+    <div class="p-4 bg-white shadow rounded-lg">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700 text-center">User Roles</h3>
+        <div class="flex justify-center items-center" style="height: 180px;">
+            <canvas id="userRoleChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Two Bar Charts Side by Side -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 advanced-feature">
+    <!-- Projects by Municipality -->
+    <div class="p-4 bg-white shadow rounded-lg">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">Projects by Municipality</h3>
+        <div style="height: 250px;">
+            <canvas id="municipalityChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Monthly Projects Chart -->
+    <div class="p-4 bg-white shadow rounded-lg">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">Monthly Project Distribution{% if report_year != 'All Years' %} – {{ report_year }}{% endif %}</h3>
+        <div style="height: 250px;">
+            <canvas id="monthlyProjectsChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Row 3: Top Equipment by Allocated Quantity -->
+<div class="p-4 bg-white shadow rounded-lg mb-6 advanced-feature">
+    <h3 class="text-sm font-semibold mb-2 text-gray-700">
+        Top Equipment by Allocated Quantity{% if report_year != 'All Years' %} – Fiscal Year {{ report_year }}{% endif %}
+    </h3>
+    <div style="height: 250px;">
+        <canvas id="topEquipmentChart"></canvas>
+    </div>
+</div>
+
+<!-- Row 4: Full-width Approved Amounts Chart -->
+<div class="p-4 bg-white shadow rounded-lg mb-6 advanced-feature">
+    <h3 class="text-sm font-semibold mb-2 text-gray-700">
+        Top 10 Projects by Approved Amount{% if report_year != 'All Years' %} – Fiscal Year {{ report_year }}{% endif %}
+    </h3>
+    <div style="height: 300px;">
+        <canvas id="approvedAmountChart"></canvas>
+    </div>
+</div>
+
+<!-- Equipment Allocation Summary Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 mb-6">
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded shadow">
+        <div class="text-2xl font-bold text-yellow-700">{{ allocations_pending }}</div>
+        <div class="text-sm text-yellow-600">Allocations Pending</div>
+    </div>
+    <div class="bg-blue-100 border-l-4 border-blue-500 p-4 rounded shadow">
+        <div class="text-2xl font-bold text-blue-700">{{ allocations_delivered }}</div>
+        <div class="text-sm text-blue-600">Allocations Delivered</div>
+    </div>
+    <div class="bg-green-100 border-l-4 border-green-500 p-4 rounded shadow">
+        <div class="text-2xl font-bold text-green-700">{{ total_allocated_items }}</div>
+        <div class="text-sm text-green-600">Total Allocated Items</div>
+    </div>
+    <div class="bg-red-100 border-l-4 border-red-500 p-4 rounded shadow">
+        <div class="text-2xl font-bold text-red-700">{{ total_delivered_items }}</div>
+        <div class="text-sm text-red-600">Total Delivered Items</div>
+    </div>
+</div>
+
+<!-- DOST Compliance Section -->
+<div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-6">
+    <h2 class="text-lg font-bold text-blue-800 mb-4">
+        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+        </svg>
+        DOST Compliance Reports
+    </h2>
+    
+    <!-- Tranche Summary Cards -->
+    <h3 class="text-md font-semibold text-blue-700 mb-3">Fund Tranche Summary</h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white border border-orange-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-orange-600">{{ total_tranches }}</div>
+            <div class="text-sm text-gray-600">Total Tranches</div>
+        </div>
+        <div class="bg-white border border-green-200 p-4 rounded-lg shadow-sm">
+            <div class="text-xl font-bold text-green-600">₱{{ total_tranche_amount|floatformat:0|intcomma }}</div>
+            <div class="text-sm text-gray-600">Total Released</div>
+        </div>
+        <div class="bg-white border border-blue-200 p-4 rounded-lg shadow-sm">
+            <div class="text-xl font-bold text-blue-600">₱{{ total_liquidated_amount|floatformat:0|intcomma }}</div>
+            <div class="text-sm text-gray-600">Total Liquidated</div>
+        </div>
+        <div class="bg-white border border-purple-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-purple-600">{{ liquidation_rate }}%</div>
+            <div class="text-sm text-gray-600">Liquidation Rate</div>
+        </div>
+    </div>
+    
+    <!-- Tranche Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- Tranche Status Distribution -->
+        <div class="p-4 bg-white shadow rounded-lg">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700 text-center">Tranche Status Distribution</h3>
+            <div class="flex justify-center items-center" style="height: 180px;">
+                <canvas id="trancheStatusChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Tranche by Project Chart -->
+        <div class="p-4 bg-white shadow rounded-lg">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">Released vs Liquidated by Project</h3>
+            <div style="height: 180px;">
+                <canvas id="trancheByProjectChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Equipment Tracking Summary -->
+    <h3 class="text-md font-semibold text-blue-700 mb-3">Equipment Tracking Summary</h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-gray-700">{{ total_equipment }}</div>
+            <div class="text-sm text-gray-600">Total Equipment</div>
+        </div>
+        <div class="bg-white border border-blue-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-blue-600">{{ equipment_with_tags }}</div>
+            <div class="text-sm text-gray-600">With Property Tags</div>
+        </div>
+        <div class="bg-white border border-green-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-green-600">{{ equipment_tag_rate }}%</div>
+            <div class="text-sm text-gray-600">Tag Assignment Rate</div>
+        </div>
+        <div class="bg-white border border-purple-200 p-4 rounded-lg shadow-sm">
+            <div class="text-xs font-medium text-purple-600">DOST SETUP</div>
+            <div class="text-sm text-gray-600">Equipment Program</div>
+        </div>
+    </div>
+    
+    <!-- Equipment Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- Equipment Ownership Status -->
+        <div class="p-4 bg-white shadow rounded-lg">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700 text-center">Equipment Ownership Status</h3>
+            <div class="flex justify-center items-center" style="height: 180px;">
+                <canvas id="equipmentOwnershipChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Equipment by Category -->
+        <div class="p-4 bg-white shadow rounded-lg">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700 text-center">Equipment by Category</h3>
+            <div class="flex justify-center items-center" style="height: 180px;">
+                <canvas id="equipmentCategoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Budget Allocation Overview -->
+    <h3 class="text-md font-semibold text-blue-700 mb-3">Budget & Allocation Overview</h3>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-gray-700">{{ total_budgets }}</div>
+            <div class="text-sm text-gray-600">Total Budgets</div>
+        </div>
+        <div class="bg-white border border-gray-300 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-gray-500">{{ total_allocations }}</div>
+            <div class="text-sm text-gray-600">Total Allocations</div>
+        </div>
+        <div class="bg-white border border-yellow-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-yellow-600">{{ total_allocated_items }}</div>
+            <div class="text-sm text-gray-600">Allocated Items (count)</div>
+        </div>
+        <div class="bg-white border border-green-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-green-600">{{ total_delivered_items }}</div>
+            <div class="text-sm text-gray-600">Delivered Items (count)</div>
+        </div>
+        <div class="bg-white border border-purple-200 p-4 rounded-lg shadow-sm">
+            <div class="text-2xl font-bold text-purple-600">{{ utilization_rate }}%</div>
+            <div class="text-sm text-gray-600">Utilization Rate</div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+<script>
+    // Wait for DOM and Chart.js to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM ready, Chart.js available:', typeof Chart !== 'undefined');
+        
+        // -----------------------------
+        // Proposal Status Pie Chart
+        // -----------------------------
+        try {
+            const ctxProposal = document.getElementById('proposalPieChart');
+        if (ctxProposal) {
+            const ctx = ctxProposal.getContext('2d');
+            
+            // Get data from Django template with fallback
+            let proposalCounts = {"pending": 0, "approved": 0, "rejected": 0};
+            try {
+                const djangoData = {{ proposal_status_counts|safe }};
+                if (djangoData && typeof djangoData === 'object') {
+                    proposalCounts = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for proposal chart');
+            }
+            
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Pending', 'Approved', 'Declined'],
+                        datasets: [{
+                            label: 'Proposal Status',
+                            data: [
+                                proposalCounts.pending || 0,
+                                proposalCounts.approved || 0,
+                                proposalCounts.rejected || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(75, 192, 192, 0.7)',
+                                'rgba(255, 99, 132, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(255, 206, 86, 1)',
+                                'rgba(75, 192, 192, 1)',
+                                'rgba(255, 99, 132, 1)'
+                            ],
+                            borderWidth: 2,
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '45%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 }, color: '#333', boxWidth: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.raw}`;
+                                    }
+                                }
+                            },
+                            title: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating proposal status chart:', error);
+    }
+
+    // -----------------------------
+    // Project Status Distribution Chart
+    // -----------------------------
+    try {
+        const ctxProjectStatus = document.getElementById('projectStatusChart');
+        if (ctxProjectStatus) {
+            const ctx = ctxProjectStatus.getContext('2d');
+            
+            // Get data from Django template with fallback
+            let projectStatusCounts = {"New": 0, "Ongoing": 0, "Completed": 0, "Terminated": 0};
+            try {
+                const djangoData = {{ project_status_counts|safe }};
+                if (djangoData && typeof djangoData === 'object') {
+                    projectStatusCounts = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for project status chart');
+            }
+            
+            // Get labels and values dynamically from the object
+            const projectLabels = Object.keys(projectStatusCounts);
+            const projectValues = Object.values(projectStatusCounts);
+
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: projectLabels,
+                        datasets: [{
+                            label: 'Project Status',
+                            data: projectValues,
+                            backgroundColor: [
+                                'rgba(156, 163, 175, 0.7)',
+                                'rgba(59, 130, 246, 0.7)',
+                                'rgba(34, 197, 94, 0.7)',
+                                'rgba(239, 68, 68, 0.7)',
+                                'rgba(139, 92, 246, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(156, 163, 175, 1)',
+                                'rgba(59, 130, 246, 1)',
+                                'rgba(34, 197, 94, 1)',
+                                'rgba(239, 68, 68, 1)',
+                                'rgba(139, 92, 246, 1)'
+                            ],
+                            borderWidth: 2,
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '45%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 }, color: '#333', boxWidth: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.raw} project(s)`;
+                                    }
+                                }
+                            },
+                            title: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating project status chart:', error);
+    }
+
+    // -----------------------------
+    // User Role Distribution Chart
+    // -----------------------------
+    try {
+        const ctxUserRole = document.getElementById('userRoleChart');
+        if (ctxUserRole) {
+            const ctx = ctxUserRole.getContext('2d');
+            
+            // Get data from Django template with fallback
+            let userRoleCounts = {"Administrator": 0, "Staff": 0, "Proponent": 0, "Beneficiary": 0};
+            try {
+                const djangoData = {{ user_role_counts|safe }};
+                if (djangoData && typeof djangoData === 'object') {
+                    userRoleCounts = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for user role chart');
+            }
+            
+            // Get labels and values dynamically from the object
+            const roleLabels = Object.keys(userRoleCounts);
+            const roleValues = Object.values(userRoleCounts);
+
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: roleLabels,
+                        datasets: [{
+                            label: 'User Roles',
+                            data: roleValues,
+                            backgroundColor: [
+                                'rgba(139, 92, 246, 0.7)',
+                                'rgba(236, 72, 153, 0.7)',
+                                'rgba(14, 165, 233, 0.7)',
+                                'rgba(245, 158, 11, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(139, 92, 246, 1)',
+                                'rgba(236, 72, 153, 1)',
+                                'rgba(14, 165, 233, 1)',
+                                'rgba(245, 158, 11, 1)'
+                            ],
+                            borderWidth: 2,
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '45%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 }, color: '#333', boxWidth: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.raw} user(s)`;
+                                    }
+                                }
+                            },
+                            title: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating user role chart:', error);
+    }
+
+    // -----------------------------
+    // Project Timeline Status Chart
+    // -----------------------------
+    try {
+        const ctxTimeline = document.getElementById('projectTimelineChart');
+        if (ctxTimeline) {
+            const ctx = ctxTimeline.getContext('2d');
+
+            // Get data from Django template with fallback
+            let projectStatusCounts = {"New": 0, "Ongoing": 0, "Completed": 0, "Terminated": 0};
+            try {
+                const djangoData = {{ project_status_counts|safe }};
+                if (djangoData && typeof djangoData === 'object') {
+                    projectStatusCounts = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for project timeline chart');
+            }
+
+            // Use project status data to show timeline distribution
+            const timelineLabels = ['Planning', 'Ongoing', 'Completed'];
+            const timelineData = [
+                (projectStatusCounts.New || 0) + (projectStatusCounts.Pending || 0), // Planning phase
+                projectStatusCounts.Ongoing || 0, // Current projects
+                projectStatusCounts.Completed || 0 // Completed projects
+            ];
+
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: timelineLabels,
+                        datasets: [{
+                            label: 'Project Timeline',
+                            data: timelineData,
+                            backgroundColor: [
+                                'rgba(245, 158, 11, 0.7)',  // Orange for planning
+                                'rgba(59, 130, 246, 0.7)',   // Blue for ongoing
+                                'rgba(34, 197, 94, 0.7)'     // Green for completed
+                            ],
+                            borderColor: [
+                                'rgba(245, 158, 11, 1)',
+                                'rgba(59, 130, 246, 1)',
+                                'rgba(34, 197, 94, 1)'
+                            ],
+                            borderWidth: 2,
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '45%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 }, color: '#333', boxWidth: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.raw} project(s)`;
+                                    }
+                                }
+                            },
+                            title: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating project timeline chart:', error);
+    }
+
+    // -----------------------------
+    // Projects by Municipality Chart
+    // -----------------------------
+    try {
+        const ctxMunicipality = document.getElementById('municipalityChart');
+        if (ctxMunicipality) {
+            const ctx = ctxMunicipality.getContext('2d');
+            
+            // Get data from Django template with fallback
+            let municipalityCounts = {};
+            try {
+                const djangoData = {{ municipality_counts|safe }};
+                if (djangoData && typeof djangoData === 'object') {
+                    municipalityCounts = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for municipality chart');
+                municipalityCounts = {"Sample Municipality": 0};
+            }
+            
+            const municipalityLabels = Object.keys(municipalityCounts);
+            const municipalityData = Object.values(municipalityCounts);
+
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: municipalityLabels,
+                        datasets: [{
+                            label: 'Number of Projects',
+                            data: municipalityData,
+                            backgroundColor: [
+                                'rgba(59, 130, 246, 0.7)',
+                                'rgba(34, 197, 94, 0.7)',
+                                'rgba(245, 158, 11, 0.7)',
+                                'rgba(239, 68, 68, 0.7)',
+                                'rgba(139, 92, 246, 0.7)',
+                                'rgba(236, 72, 153, 0.7)',
+                                'rgba(14, 165, 233, 0.7)',
+                                'rgba(156, 163, 175, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(59, 130, 246, 1)',
+                                'rgba(34, 197, 94, 1)',
+                                'rgba(245, 158, 11, 1)',
+                                'rgba(239, 68, 68, 1)',
+                                'rgba(139, 92, 246, 1)',
+                                'rgba(236, 72, 153, 1)',
+                                'rgba(14, 165, 233, 1)',
+                                'rgba(156, 163, 175, 1)'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { title: { display: false } },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Projects', font: { size: 11 } },
+                                ticks: { precision: 0 }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.raw} project(s)`;
+                                    }
+                                }
+                            },
+                            title: { display: false }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating municipality chart:', error);
+    }
+
+    // -----------------------------
+    // Monthly Projects Chart
+    // -----------------------------
+    try {
+        const ctxMonthly = document.getElementById('monthlyProjectsChart');
+        if (ctxMonthly) {
+            const ctx = ctxMonthly.getContext('2d');
+            
+            // Get data from Django template with fallback
+            let monthlyProjects = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            try {
+                const djangoData = {{ monthly_projects|safe }};
+                if (Array.isArray(djangoData)) {
+                    monthlyProjects = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for monthly projects chart');
+            }
+            
+            const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: monthLabels,
+                        datasets: [{
+                            label: 'Projects Started',
+                            data: monthlyProjects,
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: 'rgba(59, 130, 246, 1)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { title: { display: false } },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Projects', font: { size: 11 } },
+                                ticks: { precision: 0 }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.raw} project(s) started`;
+                                    }
+                                }
+                            },
+                            title: { display: false }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating monthly projects chart:', error);
+    }
+
+    // -----------------------------
+    // Approved Amounts Chart
+    // -----------------------------
+    try {
+        const ctxApproved = document.getElementById('approvedAmountChart');
+        if (ctxApproved) {
+            const ctx = ctxApproved.getContext('2d');
+            
+            // Get data from Django template with fallback
+            let approvedLabels = [];
+            let approvedData = [];
+            try {
+                const labelsData = {{ scatter_labels|safe }};
+                const dataData = {{ scatter_data|safe }};
+                if (Array.isArray(labelsData) && Array.isArray(dataData)) {
+                    approvedLabels = labelsData;
+                    approvedData = dataData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for approved amounts chart');
+                approvedLabels = ['Sample Project'];
+                approvedData = [0];
+            }
+
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: approvedLabels,
+                        datasets: [{
+                            label: 'Approved Amount (₱)',
+                            data: approvedData,
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Amount (₱)', font: { size: 11 } },
+                                ticks: { precision: 0 }
+                            },
+                            y: { title: { display: false } }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `₱${Number(context.raw).toLocaleString()}`;
+                                    }
+                                }
+                            },
+                            title: { display: false }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating approved amounts chart:', error);
+    }
+
+    // -----------------------------
+    // Bar Chart: Top Equipment by Allocated Quantity
+    // -----------------------------
+    try {
+        const ctxTop = document.getElementById('topEquipmentChart');
+        if (ctxTop) {
+            const ctx = ctxTop.getContext('2d');
+
+            // Get data from Django template with fallback
+            let labels = [];
+            let values = [];
+            try {
+                const labelsData = {{ top_equipment_labels|safe }};
+                const valuesData = {{ top_equipment_values|safe }};
+                if (Array.isArray(labelsData) && Array.isArray(valuesData)) {
+                    labels = labelsData;
+                    values = valuesData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for top equipment chart');
+                labels = ['Sample Item'];
+                values = [0];
+            }
+
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Allocated Quantity',
+                            data: values,
+                            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { beginAtZero: true, title: { display: true, text: 'Quantity' } },
+                            y: { title: { display: false } }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.raw}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating top equipment chart:', error);
+    }
+
+    // -----------------------------
+    // DOST: Tranche Status Chart
+    // -----------------------------
+    try {
+        const ctxTrancheStatus = document.getElementById('trancheStatusChart');
+        if (ctxTrancheStatus) {
+            const ctx = ctxTrancheStatus.getContext('2d');
+            
+            let trancheStatusCounts = {"pending": 0, "released": 0, "partially_liquidated": 0, "fully_liquidated": 0};
+            try {
+                const djangoData = {{ tranche_status_counts|safe }};
+                if (djangoData && typeof djangoData === 'object') {
+                    trancheStatusCounts = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for tranche status chart');
+            }
+            
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Pending', 'Released', 'Partially Liquidated', 'Fully Liquidated'],
+                        datasets: [{
+                            data: [
+                                trancheStatusCounts.pending || 0,
+                                trancheStatusCounts.released || 0,
+                                trancheStatusCounts.partially_liquidated || 0,
+                                trancheStatusCounts.fully_liquidated || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 159, 64, 0.7)',
+                                'rgba(75, 192, 192, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(255, 206, 86, 1)',
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 159, 64, 1)',
+                                'rgba(75, 192, 192, 1)'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '45%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating tranche status chart:', error);
+    }
+
+    // -----------------------------
+    // DOST: Tranche by Project Chart
+    // -----------------------------
+    try {
+        const ctxTrancheProject = document.getElementById('trancheByProjectChart');
+        if (ctxTrancheProject) {
+            const ctx = ctxTrancheProject.getContext('2d');
+            
+            let projectLabels = [];
+            let releasedAmounts = [];
+            let liquidatedAmounts = [];
+            try {
+                projectLabels = {{ tranche_project_labels|safe }};
+                releasedAmounts = {{ tranche_released_amounts|safe }};
+                liquidatedAmounts = {{ tranche_liquidated_amounts|safe }};
+            } catch (e) {
+                console.warn('Using fallback data for tranche project chart');
+            }
+            
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: projectLabels,
+                        datasets: [
+                            {
+                                label: 'Released',
+                                data: releasedAmounts,
+                                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Liquidated',
+                                data: liquidatedAmounts,
+                                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { ticks: { font: { size: 8 } } },
+                            y: { 
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '₱' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 } } }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating tranche by project chart:', error);
+    }
+
+    // -----------------------------
+    // DOST: Equipment Ownership Status Chart
+    // -----------------------------
+    try {
+        const ctxEquipmentOwnership = document.getElementById('equipmentOwnershipChart');
+        if (ctxEquipmentOwnership) {
+            const ctx = ctxEquipmentOwnership.getContext('2d');
+            
+            let ownershipCounts = {"leased": 0, "transferred": 0, "pending_transfer": 0, "returned": 0};
+            try {
+                const djangoData = {{ equipment_ownership_counts|safe }};
+                if (djangoData && typeof djangoData === 'object') {
+                    ownershipCounts = djangoData;
+                }
+            } catch (e) {
+                console.warn('Using fallback data for equipment ownership chart');
+            }
+            
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Leased', 'Transferred', 'Pending Transfer', 'Returned'],
+                        datasets: [{
+                            data: [
+                                ownershipCounts.leased || 0,
+                                ownershipCounts.transferred || 0,
+                                ownershipCounts.pending_transfer || 0,
+                                ownershipCounts.returned || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(59, 130, 246, 0.7)',
+                                'rgba(34, 197, 94, 0.7)',
+                                'rgba(249, 115, 22, 0.7)',
+                                'rgba(156, 163, 175, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(59, 130, 246, 1)',
+                                'rgba(34, 197, 94, 1)',
+                                'rgba(249, 115, 22, 1)',
+                                'rgba(156, 163, 175, 1)'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '45%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating equipment ownership chart:', error);
+    }
+
+    // -----------------------------
+    // DOST: Equipment by Category Chart
+    // -----------------------------
+    try {
+        const ctxEquipmentCategory = document.getElementById('equipmentCategoryChart');
+        if (ctxEquipmentCategory) {
+            const ctx = ctxEquipmentCategory.getContext('2d');
+            
+            let categoryData = {};
+            try {
+                categoryData = {{ equipment_by_category|safe }};
+            } catch (e) {
+                console.warn('Using fallback data for equipment category chart');
+            }
+            
+            const categoryLabels = Object.keys(categoryData);
+            const categoryValues = Object.values(categoryData);
+            
+            // Generate colors for categories
+            const categoryColors = [
+                'rgba(59, 130, 246, 0.7)',
+                'rgba(34, 197, 94, 0.7)',
+                'rgba(249, 115, 22, 0.7)',
+                'rgba(139, 92, 246, 0.7)',
+                'rgba(236, 72, 153, 0.7)',
+                'rgba(20, 184, 166, 0.7)',
+                'rgba(245, 158, 11, 0.7)',
+                'rgba(107, 114, 128, 0.7)'
+            ];
+            
+            if (typeof Chart !== 'undefined') {
+                new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: categoryLabels,
+                        datasets: [{
+                            data: categoryValues,
+                            backgroundColor: categoryColors.slice(0, categoryLabels.length),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error creating equipment category chart:', error);
+    }
+
+    }); // End of DOMContentLoaded
+</script>
+
+<!-- PDF Export Manager Function -->
+<script>
+function pdfExportManager() {
+    return {
+        showPdfPreview: false,
+        pdfUrl: '',
+        sections: {
+            summary: true,
+            equipment: true,
+            projects: true,
+            proposals: true,
+            charts: true,
+            signatory: true,
+            esignature: false
+        },
+        sortOptions: {
+            projects: 'municipality',
+            proposals: 'municipality'
+        },
+        init() {
+            // Get URL from data attribute
+            this.pdfUrl = this.$el.dataset.pdfUrl;
+            
+            // Listen for button click
+            const btn = document.getElementById('openPdfPreviewBtn');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    this.showPdfPreview = true;
+                });
+            }
+        },
+        selectAll() {
+            Object.keys(this.sections).forEach(key => this.sections[key] = true);
+        },
+        deselectAll() {
+            Object.keys(this.sections).forEach(key => this.sections[key] = false);
+        },
+        exportPdf() {
+            // Get current filter values
+            const year = document.getElementById('year')?.value || '';
+            const startDate = document.getElementById('start_date')?.value || '';
+            const endDate = document.getElementById('end_date')?.value || '';
+            const status = document.getElementById('status')?.value || '';
+            const municipality = document.getElementById('municipality')?.value || '';
+            
+            // Build URL with parameters
+            let url = this.pdfUrl + '?';
+            const params = [];
+            
+            if (year) params.push('year=' + encodeURIComponent(year));
+            if (startDate) params.push('start_date=' + encodeURIComponent(startDate));
+            if (endDate) params.push('end_date=' + encodeURIComponent(endDate));
+            if (status) params.push('status=' + encodeURIComponent(status));
+            if (municipality) params.push('municipality=' + encodeURIComponent(municipality));
+            
+            // Add section parameters
+            Object.keys(this.sections).forEach(key => {
+                params.push('include_' + key + '=' + (this.sections[key] ? '1' : '0'));
+            });
+            
+            // Add sort parameters
+            params.push('sort_projects=' + encodeURIComponent(this.sortOptions.projects));
+            params.push('sort_proposals=' + encodeURIComponent(this.sortOptions.proposals));
+            
+            url += params.join('&');
+            
+            // Open in new tab
+            window.open(url, '_blank');
+            this.showPdfPreview = false;
+        }
+    };
+}
+</script>
+{% endblock %}

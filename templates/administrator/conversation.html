@@ -1,0 +1,202 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Conversation with {{ partner.get_full_name }} - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <a href="{% url 'administrator_messages_url' %}"
+                           class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition duration-200 mr-4">
+                            <span class="material-icons text-sm mr-1">arrow_back</span>
+                            Back to Messages
+                        </a>
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center mr-3">
+                                <span class="text-gray-600 font-medium text-lg">
+                                    {{ partner.first_name|first|upper }}{{ partner.last_name|first|upper }}
+                                </span>
+                            </div>
+                            <div>
+                                <h1 class="text-2xl font-bold text-gray-900">{{ partner.get_full_name }}</h1>
+                                <p class="text-sm text-gray-500">
+                                    {% if partner.role == 'dost_staff' %}
+                                        DOST Staff
+                                    {% elif partner.role == 'proponent' %}
+                                        Project Proponent
+                                    {% elif partner.role == 'beneficiary' %}
+                                        Project Beneficiary
+                                    {% else %}
+                                        {{ partner.get_role_display }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="{% url 'administrator_communication_hub_url' %}"
+                       class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition duration-200">
+                        <span class="material-icons text-sm mr-2">arrow_back</span>
+                        Back to Hub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white rounded-lg shadow-sm border h-96 flex flex-col">
+            <!-- Messages Container -->
+            <div id="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
+                {% for message in conversation_messages %}
+                <div class="flex {% if message.sender == user %}justify-end{% else %}justify-start{% endif %}">
+                    <div class="max-w-xs lg:max-w-md xl:max-w-lg">
+                        <div class="flex items-start space-x-2 {% if message.sender == user %}flex-row-reverse space-x-reverse{% endif %}">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                                    <span class="text-gray-600 font-medium text-sm">
+                                        {% if message.sender == user %}
+                                            {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                                        {% else %}
+                                            {{ partner.first_name|first|upper }}{{ partner.last_name|first|upper }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="bg-{% if message.sender == user %}blue-600 text-white{% else %}gray-100 text-gray-900{% endif %} rounded-lg px-4 py-2 shadow-sm relative group">
+                                <!-- Delete button -->
+                                <button onclick="deleteMessage({{ message.id }})" 
+                                        class="absolute -top-2 {% if message.sender == user %}-left-6{% else %}-right-6{% endif %} opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-gray-400 hover:text-red-500"
+                                        title="Delete for me">
+                                    <span class="material-icons text-sm">close</span>
+                                </button>
+                                {% if message.attachment %}
+                                <div class="mb-2">
+                                    <a href="{{ message.attachment.url }}" target="_blank"
+                                       class="inline-flex items-center text-sm {% if message.sender == user %}text-blue-200 hover:text-blue-100{% else %}text-blue-600 hover:text-blue-800{% endif %}">
+                                        <span class="material-icons text-sm mr-1">attach_file</span>
+                                        {{ message.attachment.name }}
+                                    </a>
+                                </div>
+                                {% endif %}
+                                <p class="text-sm">{{ message.content }}</p>
+                                <p class="text-xs {% if message.sender == user %}text-blue-200{% else %}text-gray-500{% endif %} mt-1">
+                                    {{ message.created_at|date:"M d, H:i" }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-12">
+                    <span class="material-icons text-gray-400 text-4xl mb-4">chat</span>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+                    <p class="text-gray-500">Start the conversation by sending a message below.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Message Input -->
+            <div class="border-t p-4">
+                <form method="post" enctype="multipart/form-data" class="space-y-3">
+                    {% csrf_token %}
+                    <div class="flex items-end space-x-3">
+                        <div class="flex-1">
+                            <label for="reply_content" class="sr-only">Message</label>
+                            <textarea id="reply_content" name="reply_content" rows="2"
+                                      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      placeholder="Type your message..." required></textarea>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <label for="reply_attachment" class="cursor-pointer">
+                                <span class="material-icons text-gray-500 hover:text-gray-700 text-xl">attach_file</span>
+                                <input type="file" id="reply_attachment" name="reply_attachment" class="hidden">
+                            </label>
+                            <button type="submit"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200">
+                                <span class="material-icons text-sm mr-1">send</span>
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                    <div id="filePreview" class="hidden">
+                        <p class="text-sm text-gray-600">
+                            <span class="material-icons text-sm mr-1">attach_file</span>
+                            <span id="fileName"></span>
+                            <button type="button" onclick="clearFile()" class="text-red-500 hover:text-red-700 ml-2">
+                                <span class="material-icons text-sm">close</span>
+                            </button>
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-scroll to bottom of messages
+document.addEventListener('DOMContentLoaded', function() {
+    const messagesContainer = document.getElementById('messagesContainer');
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+});
+
+// Handle Enter key to send message
+document.getElementById('reply_content').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.form.submit();
+    }
+});
+
+// File attachment preview
+document.getElementById('reply_attachment').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const filePreview = document.getElementById('filePreview');
+    const fileName = document.getElementById('fileName');
+
+    if (file) {
+        fileName.textContent = file.name;
+        filePreview.classList.remove('hidden');
+    } else {
+        filePreview.classList.add('hidden');
+    }
+});
+
+function clearFile() {
+    document.getElementById('reply_attachment').value = '';
+    document.getElementById('filePreview').classList.add('hidden');
+}
+
+// Delete individual message (one-sided)
+function deleteMessage(messageId) {
+    if (!confirm('Delete this message? This will only remove it from your view, not the other person\'s.')) {
+        return;
+    }
+    
+    fetch(`/messages/delete/${messageId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error deleting message: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        alert('Error deleting message');
+        console.error(err);
+    });
+}
+</script>
+{% endblock %}

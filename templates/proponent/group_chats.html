@@ -1,0 +1,79 @@
+{% extends 'proponent/base.html' %}
+{% load static %}
+
+{% block title %}Group Chats - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Group Chats</h1>
+                        <p class="mt-1 text-sm text-gray-500">Communicate with your team members</p>
+                    </div>
+                    <!-- Create button removed - only Admin/Staff can create group chats -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% if user_group_chats %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for chat_member in user_group_chats %}
+            <a href="{% url 'proponent_group_chat_detail_url' chat_id=chat_member.group_chat.id %}"
+               class="bg-white rounded-lg shadow-sm border hover:shadow-md transition duration-200 block">
+                <div class="p-6">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-gray-900 truncate">{{ chat_member.group_chat.name }}</h3>
+                            {% if chat_member.group_chat.description %}
+                            <p class="mt-1 text-sm text-gray-600 line-clamp-2">{{ chat_member.group_chat.description }}</p>
+                            {% endif %}
+                            {% if chat_member.group_chat.project %}
+                            <p class="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full inline-block">
+                                {{ chat_member.group_chat.project.project_title }}
+                            </p>
+                            {% endif %}
+                        </div>
+                        {% if chat_member.role == 'admin' %}
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-700 bg-purple-100 rounded-full">
+                            Admin
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-4 flex items-center justify-between">
+                        <div class="text-sm text-gray-500">
+                            {{ chat_member.member_count }} member{{ chat_member.member_count|pluralize }}
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            Updated {{ chat_member.group_chat.updated_at|date:"M d, H:i" }}
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200">
+                            <span class="material-icons text-sm mr-2">chat</span>
+                            Open Chat
+                        </div>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center">
+                <span class="material-icons text-4xl text-gray-400">chat</span>
+            </div>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">No group chats yet</h3>
+            <p class="mt-1 text-sm text-gray-500">You will be added to group chats by administrators or staff members.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

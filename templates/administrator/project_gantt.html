@@ -1,0 +1,337 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Gantt Chart - {{ project.title }} - DOST Admin{% endblock %}
+
+{% block page-title %}
+<div class="flex items-center gap-2">
+    <span class="material-icons text-purple-600">view_timeline</span>
+    Project Timeline
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .gantt-container {
+        overflow-x: auto;
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    
+    .gantt-header {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        border-bottom: 2px solid #e5e7eb;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .gantt-row {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        min-height: 50px;
+        border-bottom: 1px solid #f3f4f6;
+        align-items: center;
+    }
+    
+    .gantt-task-info {
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .gantt-task-name {
+        font-weight: 500;
+        color: #374151;
+    }
+    
+    .gantt-timeline {
+        position: relative;
+        height: 40px;
+        background: linear-gradient(90deg, #f3f4f6 1px, transparent 1px);
+        background-size: calc(100% / 12) 100%;
+    }
+    
+    .gantt-bar {
+        position: absolute;
+        height: 28px;
+        top: 6px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        color: white;
+        font-size: 12px;
+        font-weight: 500;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.2s;
+    }
+    
+    .gantt-bar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .gantt-bar.pending { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .gantt-bar.in_progress { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    .gantt-bar.completed { background: linear-gradient(135deg, #10b981, #059669); }
+    .gantt-bar.delayed { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    
+    .gantt-progress {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: rgba(255,255,255,0.3);
+        border-radius: 6px 0 0 6px;
+    }
+    
+    .milestone-status {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-in_progress { background: #dbeafe; color: #1e40af; }
+    .status-completed { background: #d1fae5; color: #065f46; }
+    .status-delayed { background: #fee2e2; color: #991b1b; }
+    
+    .month-header {
+        display: flex;
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    
+    .month-header span {
+        flex: 1;
+        text-align: center;
+        padding: 4px;
+        border-right: 1px solid #e5e7eb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb (visible in Simple Mode) -->
+<nav class="breadcrumb">
+    <a href="{% url 'administrator_dashboard_url' %}">Dashboard</a>
+    <span class="separator">›</span>
+    <a href="{% url 'administrator_projects_url' %}">Projects</a>
+    <span class="separator">›</span>
+    <a href="{% url 'administrator_projects_detail_url' project.id %}">{{ project.title|truncatewords:5 }}</a>
+    <span class="separator">›</span>
+    <span class="current">Gantt Chart</span>
+</nav>
+
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-gray-800">{{ project.title }}</h2>
+            <p class="text-sm text-gray-500">Project Timeline & Milestones</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'administrator_projects_detail_url' project.id %}" 
+               class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                <span class="material-icons text-sm">arrow_back</span>
+                Back to Project
+            </a>
+            <button onclick="openAddMilestoneModal()" 
+                    class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                    data-tooltip="Add a new milestone to track project progress">
+                <span class="material-icons">add</span>
+                Add Milestone
+            </button>
+        </div>
+    </div>
+
+    <!-- Project Info -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-blue-50 rounded-lg p-4">
+            <div class="text-sm text-blue-600">Start Date</div>
+            <div class="text-lg font-bold text-blue-800">{{ project.date_started|date:"M d, Y"|default:"Not set" }}</div>
+        </div>
+        <div class="bg-red-50 rounded-lg p-4">
+            <div class="text-sm text-red-600">Target Completion</div>
+            <div class="text-lg font-bold text-red-800">{{ project.date_of_completion|date:"M d, Y"|default:"Not set" }}</div>
+        </div>
+        <div class="bg-green-50 rounded-lg p-4">
+            <div class="text-sm text-green-600">Status</div>
+            <div class="text-lg font-bold text-green-800">{{ project.get_status_display }}</div>
+        </div>
+        <div class="bg-purple-50 rounded-lg p-4">
+            <div class="text-sm text-purple-600">Milestones</div>
+            <div class="text-lg font-bold text-purple-800">{{ milestones.count }} total</div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gradient-to-r from-yellow-500 to-yellow-600"></div>
+            <span class="text-sm text-gray-600">Pending</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gradient-to-r from-blue-500 to-blue-600"></div>
+            <span class="text-sm text-gray-600">In Progress</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gradient-to-r from-green-500 to-green-600"></div>
+            <span class="text-sm text-gray-600">Completed</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gradient-to-r from-red-500 to-red-600"></div>
+            <span class="text-sm text-gray-600">Delayed</span>
+        </div>
+    </div>
+
+    <!-- Gantt Chart -->
+    <div class="gantt-container shadow-inner border">
+        {% if milestones %}
+            <!-- Header with months -->
+            <div class="gantt-header">
+                <div class="font-semibold text-gray-700 px-3">Milestone</div>
+                <div class="month-header">
+                    <span>Jan</span>
+                    <span>Feb</span>
+                    <span>Mar</span>
+                    <span>Apr</span>
+                    <span>May</span>
+                    <span>Jun</span>
+                    <span>Jul</span>
+                    <span>Aug</span>
+                    <span>Sep</span>
+                    <span>Oct</span>
+                    <span>Nov</span>
+                    <span>Dec</span>
+                </div>
+            </div>
+            
+            <!-- Milestone Rows -->
+            {% for milestone in milestones %}
+            <div class="gantt-row hover:bg-gray-50">
+                <div class="gantt-task-info">
+                    <span class="milestone-status status-{{ milestone.status }}">{{ milestone.progress_percentage }}%</span>
+                    <span class="gantt-task-name">{{ milestone.title }}</span>
+                </div>
+                <div class="gantt-timeline">
+                    {% with start_month=milestone.planned_start.month end_month=milestone.planned_end.month %}
+                    <div class="gantt-bar {{ milestone.status }}" 
+                         style="left: calc(({{ start_month }} - 1) * 100% / 12); width: calc(({{ end_month }} - {{ start_month }} + 1) * 100% / 12);"
+                         title="{{ milestone.title }}: {{ milestone.planned_start }} - {{ milestone.planned_end }}">
+                        <div class="gantt-progress" style="width: {{ milestone.progress_percentage }}%;"></div>
+                        <span class="relative z-10">{{ milestone.title|truncatewords:3 }}</span>
+                    </div>
+                    {% endwith %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center py-12 text-gray-500">
+                <span class="material-icons text-5xl mb-4">timeline</span>
+                <p class="text-lg">No milestones defined yet</p>
+                <p class="text-sm">Add milestones to visualize your project timeline</p>
+                <button onclick="openAddMilestoneModal()" 
+                        class="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2">
+                    <span class="material-icons">add</span>
+                    Add First Milestone
+                </button>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Tasks Section -->
+    {% if tasks %}
+    <div class="mt-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Related Tasks</h3>
+        <div class="space-y-2">
+            {% for task in tasks %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3">
+                    <span class="material-icons text-sm {% if task.status == 'completed' %}text-green-500{% else %}text-gray-400{% endif %}">
+                        {% if task.status == 'completed' %}check_circle{% else %}radio_button_unchecked{% endif %}
+                    </span>
+                    <span class="{% if task.status == 'completed' %}line-through text-gray-400{% else %}text-gray-700{% endif %}">{{ task.title }}</span>
+                </div>
+                <div class="text-sm text-gray-500">
+                    Due: {{ task.due_date|date:"M d, Y"|default:"No due date" }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Milestone Modal -->
+<div id="addMilestoneModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-800">Add Milestone</h3>
+            <button onclick="closeAddMilestoneModal()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-icons">close</span>
+            </button>
+        </div>
+        
+        <form action="{% url 'project_milestone_add' project.id %}" method="POST">
+            {% csrf_token %}
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Milestone Title *</label>
+                    <input type="text" name="title" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description" rows="2"
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Planned Start *</label>
+                        <input type="date" name="planned_start" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Planned End *</label>
+                        <input type="date" name="planned_end" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="closeAddMilestoneModal()" 
+                        class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                    Add Milestone
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openAddMilestoneModal() {
+        document.getElementById('addMilestoneModal').classList.remove('hidden');
+    }
+    
+    function closeAddMilestoneModal() {
+        document.getElementById('addMilestoneModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

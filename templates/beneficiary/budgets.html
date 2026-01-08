@@ -1,0 +1,91 @@
+{% extends "beneficiary/base.html" %}
+{% load static %}
+
+{% block title %}Budget Management{% endblock %}
+{% block nav-budgets %}active-nav{% endblock %}
+{% block page-title %}Budget Management{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" />
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<div class="container mt-2" x-data="{ openAdd: false, openEdit: false, editBudget: {} }">
+
+    <!-- Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white 
+                        {% if message.tags == 'success' %} bg-green-500 
+                        {% elif message.tags == 'error' %} bg-red-500 
+                        {% else %} bg-blue-500 {% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+   
+
+    <!-- Budgets Table -->
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg p-4">
+        <table id="budgetsTable" class="min-w-full text-sm text-left text-gray-600">
+            <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-4 py-2">#</th>
+                    <th class="px-4 py-2">Fiscal Year</th>
+                    <th class="px-4 py-2">Fund Source</th>
+                    <th class="px-4 py-2">Total Amount</th>
+                    <th class="px-4 py-2">Remaining Amount</th>
+                    <th class="px-4 py-2">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for budget in budgets %}
+                <tr>
+                    <td class="px-4 py-2">{{ forloop.counter }}</td>
+                    <td class="px-4 py-2">{{ budget.fiscal_year }}</td>
+                    <td class="px-4 py-2">{{ budget.fund_source }}</td>
+                    <td class="px-4 py-2">{{ budget.total_amount }}</td>
+                    <td class="px-4 py-2">{{ budget.remaining_amount }}</td>
+                    <td class="px-4 py-2 text-center">
+                        {% if budget.status == 'active' %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-green-100 text-green-800 font-medium">Active</span>
+                        {% elif budget.status == 'exhausted' %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-red-100 text-red-800 font-medium">Exhausted</span>
+                        {% elif budget.status == 'archived' %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-gray-100 text-gray-800 font-medium">Archived</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+</div>
+
+
+<script>
+$(document).ready(function () {
+    $('#budgetsTable').DataTable();
+
+    document.querySelectorAll('.editBtn').forEach(button => {
+        button.addEventListener('click', function () {
+            const root = document.querySelector('[x-data]');
+            const alpine = Alpine.$data(root);
+
+            alpine.editBudget = {
+                id: this.dataset.id,
+                fiscal_year: this.dataset.fiscal_year,
+                fund_source: this.dataset.fund_source,
+                total_amount: this.dataset.total_amount,
+                remaining_amount: this.dataset.remaining_amount,
+                status: this.dataset.status,
+            };
+            alpine.openEdit = true;
+        });
+    });
+});
+</script>
+{% endblock %}

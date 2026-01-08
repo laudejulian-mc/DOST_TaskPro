@@ -1,0 +1,225 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Create Maintenance Task - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Create Maintenance Task</h1>
+                        <p class="mt-1 text-sm text-gray-500">Schedule a new system maintenance task</p>
+                    </div>
+                    <a href="{% url 'administrator_maintenance_schedule_url' %}"
+                       class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition duration-200">
+                        <span class="material-icons text-sm mr-2">arrow_back</span>
+                        Back to Schedule
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white rounded-lg shadow-sm border">
+            <div class="px-6 py-6">
+                <form method="post" class="space-y-6">
+                    {% csrf_token %}
+
+                    <!-- Task Details -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="{{ form.title.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                Task Title *
+                            </label>
+                            <input type="text" name="{{ form.title.name }}" id="{{ form.title.id_for_label }}"
+                                   value="{{ form.title.value|default:'' }}"
+                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                   required>
+                            {% if form.title.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.title.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+
+                        <div>
+                            <label for="{{ form.maintenance_type.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                Maintenance Type *
+                            </label>
+                            <select name="{{ form.maintenance_type.name }}" id="{{ form.maintenance_type.id_for_label }}"
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                    required>
+                                <option value="">Select Type</option>
+                                {% for value, display in form.maintenance_type.field.choices %}
+                                <option value="{{ value }}" {% if form.maintenance_type.value == value %}selected{% endif %}>
+                                    {{ display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.maintenance_type.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.maintenance_type.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="{{ form.description.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            Description *
+                        </label>
+                        <textarea name="{{ form.description.name }}" id="{{ form.description.id_for_label }}"
+                                  rows="4"
+                                  class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                  placeholder="Describe the maintenance task..."
+                                  required>{{ form.description.value|default:'' }}</textarea>
+                        {% if form.description.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.description.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Scheduling -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="{{ form.scheduled_at.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                Scheduled Date & Time *
+                            </label>
+                            <input type="datetime-local" name="{{ form.scheduled_at.name }}" id="{{ form.scheduled_at.id_for_label }}"
+                                   value="{{ form.scheduled_at.value|date:'Y-m-d\TH:i' if form.scheduled_at.value else '' }}"
+                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                   required>
+                            {% if form.scheduled_at.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.scheduled_at.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+
+                        <div>
+                            <label for="{{ form.estimated_duration.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                Estimated Duration (hours)
+                            </label>
+                            <input type="number" name="{{ form.estimated_duration.name }}" id="{{ form.estimated_duration.id_for_label }}"
+                                   value="{{ form.estimated_duration.value|default:'' }}"
+                                   min="0.5" step="0.5"
+                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                   placeholder="2.5">
+                            {% if form.estimated_duration.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.estimated_duration.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Assignment -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="{{ form.assigned_to.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                Assigned To
+                            </label>
+                            <select name="{{ form.assigned_to.name }}" id="{{ form.assigned_to.id_for_label }}"
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                <option value="">Select User</option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}" {% if form.assigned_to.value == user.id|stringformat:'s' %}selected{% endif %}>
+                                    {{ user.get_full_name }} ({{ user.username }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.assigned_to.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.assigned_to.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+
+                        <div>
+                            <label for="{{ form.priority.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                Priority *
+                            </label>
+                            <select name="{{ form.priority.name }}" id="{{ form.priority.id_for_label }}"
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                    required>
+                                <option value="">Select Priority</option>
+                                {% for value, display in form.priority.field.choices %}
+                                <option value="{{ value }}" {% if form.priority.value == value %}selected{% endif %}>
+                                    {{ display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.priority.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.priority.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Recurring Options -->
+                    <div class="border-t pt-6">
+                        <div class="flex items-center mb-4">
+                            <input type="checkbox" name="is_recurring" id="is_recurring"
+                                   {% if form.is_recurring.value %}checked{% endif %}
+                                   class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+                            <label for="is_recurring" class="ml-2 block text-sm text-gray-900">
+                                This is a recurring maintenance task
+                            </label>
+                        </div>
+
+                        <div id="recurring-options" class="{% if not form.is_recurring.value %}hidden{% endif %} grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="{{ form.recurrence_pattern.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                    Recurrence Pattern
+                                </label>
+                                <select name="{{ form.recurrence_pattern.name }}" id="{{ form.recurrence_pattern.id_for_label }}"
+                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                    <option value="">Select Pattern</option>
+                                    {% for value, display in form.recurrence_pattern.field.choices %}
+                                    <option value="{{ value }}" {% if form.recurrence_pattern.value == value %}selected{% endif %}>
+                                        {{ display }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.recurrence_pattern.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ form.recurrence_pattern.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+
+                            <div>
+                                <label for="{{ form.recurrence_interval.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                    Interval
+                                </label>
+                                <input type="number" name="{{ form.recurrence_interval.name }}" id="{{ form.recurrence_interval.id_for_label }}"
+                                       value="{{ form.recurrence_interval.value|default:'1' }}"
+                                       min="1"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                {% if form.recurrence_interval.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ form.recurrence_interval.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="flex justify-end space-x-3 pt-6 border-t">
+                        <a href="{% url 'administrator_maintenance_schedule_url' %}"
+                           class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            Cancel
+                        </a>
+                        <button type="submit"
+                                class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            Create Maintenance Task
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Toggle recurring options visibility
+document.getElementById('is_recurring').addEventListener('change', function() {
+    const recurringOptions = document.getElementById('recurring-options');
+    if (this.checked) {
+        recurringOptions.classList.remove('hidden');
+    } else {
+        recurringOptions.classList.add('hidden');
+    }
+});
+</script>
+{% endblock %}

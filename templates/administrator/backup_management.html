@@ -1,0 +1,141 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+
+{% block title %}Backup Management - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Backup Management</h1>
+                        <p class="mt-1 text-sm text-gray-500">Monitor and manage system backups</p>
+                    </div>
+                    <button class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200">
+                        <span class="material-icons text-sm mr-2">backup</span>
+                        Create Backup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white rounded-lg shadow-sm border">
+            <!-- Backup Statistics -->
+            <div class="border-b px-6 py-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900">{{ backups|length }}</div>
+                        <div class="text-sm text-gray-500">Total Backups</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">{{ backups|length|add:"0" }}</div>
+                        <div class="text-sm text-gray-500">Successful</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600">0</div>
+                        <div class="text-sm text-gray-500">Failed</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">0</div>
+                        <div class="text-sm text-gray-500">Running</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backups Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Initiated By</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for backup in backups %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">{{ backup.get_backup_type_display }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {% if backup.status == 'completed' %}bg-green-100 text-green-800
+                                    {% elif backup.status == 'running' %}bg-blue-100 text-blue-800
+                                    {% elif backup.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ backup.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if backup.file_size %}
+                                    {% load mathfilters %}
+                                    {{ backup.file_size|filesizeformat }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if backup.started_at %}
+                                    {{ backup.started_at|date:"M d, Y H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if backup.completed_at %}
+                                    {{ backup.completed_at|date:"M d, Y H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if backup.initiated_by %}
+                                    {{ backup.initiated_by.get_full_name }}
+                                {% else %}
+                                    System
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    {% if backup.status == 'completed' and backup.file_path %}
+                                    <button class="text-blue-600 hover:text-blue-900">
+                                        <span class="material-icons text-sm">download</span>
+                                    </button>
+                                    {% endif %}
+                                    <button class="text-gray-600 hover:text-gray-900">
+                                        <span class="material-icons text-sm">info</span>
+                                    </button>
+                                    {% if backup.status == 'failed' %}
+                                    <button class="text-red-600 hover:text-red-900">
+                                        <span class="material-icons text-sm">delete</span>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center">
+                                <span class="material-icons text-gray-400 text-4xl mb-4">backup</span>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">No Backups Found</h3>
+                                <p class="text-gray-500">System backups will appear here once they are created.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

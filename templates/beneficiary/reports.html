@@ -1,0 +1,450 @@
+{% extends "beneficiary/base.html" %}
+{% load static %}
+
+{% block title %}Reports{% endblock %}
+{% block nav-reports %}active-nav{% endblock %}
+{% block page-title %}Reports{% endblock %}
+
+{% block content %}
+<style>[x-cloak] { display: none !important; }</style>
+
+<!-- Alpine.js -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+<h2 class="text-2xl font-bold mb-6">Overview Reports</h2>
+
+<!-- Alpine.js for collapsible filters -->
+<div x-data="{ showFilters: false }" class="mb-6">
+    <!-- Filter Toggle Button -->
+    <button @click="showFilters = !showFilters" 
+            class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition">
+        <svg x-show="!showFilters" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+        </svg>
+        <svg x-show="showFilters" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" x-cloak>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span x-text="showFilters ? 'Hide Filters' : 'Show Filters'"></span>
+    </button>
+
+    <!-- Filter Form -->
+    <div x-show="showFilters" x-transition class="bg-white p-4 rounded-lg shadow mt-4" x-cloak>
+        <h3 class="text-lg font-semibold mb-4">Filter Reports</h3>
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Year Filter -->
+        <div>
+            <label for="year" class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <select name="year" id="year" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Years</option>
+                {% for year in available_years %}
+                <option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Municipality Filter -->
+        <div>
+            <label for="municipality" class="block text-sm font-medium text-gray-700 mb-1">Municipality</label>
+            <select name="municipality" id="municipality" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Municipalities</option>
+                {% for mun in available_municipalities %}
+                <option value="{{ mun }}" {% if selected_municipality == mun %}selected{% endif %}>{{ mun }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Start Date Filter -->
+        <div>
+            <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input type="date" name="start_date" id="start_date" value="{{ start_date }}" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- End Date Filter -->
+        <div>
+            <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <input type="date" name="end_date" id="end_date" value="{{ end_date }}" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Status Filter -->
+        <div>
+            <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select name="status" id="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Statuses</option>
+                {% for status in available_statuses %}
+                <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Filter Actions -->
+        <div class="md:col-span-2 lg:col-span-5 flex gap-2">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition">
+                Apply Filters
+            </button>
+            <a href="{% url 'beneficiary_reports_url' %}" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded hover:bg-gray-600 transition">
+                Clear Filters
+            </a>
+        </div>
+    </form>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+    <!-- Column 1: Financial Summary -->
+    <div class="md:col-span-6 p-4 bg-white shadow rounded-lg">
+        <h3 class="text-xl font-semibold mb-2 text-gray-700">Financial Summary</h3>
+        <canvas id="budgetPieChart" width="400" height="400"></canvas>
+
+        <!-- PDF Export Button aligned to right -->
+        <div class="mt-4 flex justify-end">
+            <a href="#" id="financialPdfExportLink" target="_blank" 
+            class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                Export PDF
+            </a>
+        </div>
+    </div>
+
+<!-- Column 2: Proposal Status -->
+<div class="md:col-span-6 p-4 bg-white shadow rounded-lg">
+    <h3 class="text-xl font-semibold mb-2 text-gray-700">Proposal Status</h3>
+
+    <canvas id="proposalPieChart" width="400" height="400"></canvas>
+
+    <!-- Export PDF Button (below chart, aligned right, red) -->
+    <div class="mt-4 text-right">
+        <a href="#" id="proposalPdfExportLink" target="_blank"
+           class="px-4 py-2 bg-red-600 text-white font-semibold rounded hover:bg-red-700 transition">
+            Export PDF
+        </a>
+    </div>
+</div>
+
+
+</div>
+
+<!-- Full-width Approved Amounts Chart -->
+<div class="md:col-span-12 p-4 bg-white shadow rounded-lg mt-6 relative">
+    <h3 class="text-xl font-semibold mb-2 text-gray-700">
+        Overview of Approved Project Budgets – Fiscal Year {{ report_year }}
+    </h3>
+
+    <canvas id="approvedAmountChart" width="1200" height="500"></canvas>
+
+    <!-- Export PDF Button (below chart, aligned right) -->
+    <div class="mt-4 flex justify-end">
+        <a href="#" id="approvedProjectsPdfExportLink" target="_blank"
+           class="px-4 py-2 bg-red-600 text-white font-semibold rounded hover:bg-red-700 transition">
+            Export PDF
+        </a>
+    </div>
+</div>
+
+
+<!-- Full-width Line Chart: Project Assignments -->
+<div class="md:col-span-12 p-4 bg-white shadow rounded-lg mt-6">
+    <h3 class="text-xl font-semibold mb-2 text-gray-700">
+        Summary of Pending and Completed Project Assignments – Fiscal Year {{ report_year }}
+    </h3>
+    <canvas id="stepChart" width="1200" height="500"></canvas>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // -----------------------------
+    // Financial Summary Pie Chart
+    // -----------------------------
+    const ctxBudget = document.getElementById('budgetPieChart').getContext('2d');
+    const spent = {{ total_spent|floatformat:0 }};
+    const remaining = {{ total_remaining|floatformat:0 }};
+
+    new Chart(ctxBudget, {
+        type: 'doughnut',
+        data: {
+            labels: ['Spent', 'Remaining'],
+            datasets: [{
+                label: 'Financial Overview',
+                data: [spent, remaining],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)'
+                ],
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '40%',
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 14 }, color: '#333' } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ₱${Number(context.raw).toLocaleString()}`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Financial Summary: Total Budget, Spent, Remaining',
+                    font: { size: 18, weight: 'bold' },
+                    color: '#333'
+                }
+            }
+        }
+    });
+
+    // -----------------------------
+    // Proposal Status Pie Chart
+    // -----------------------------
+    const ctxProposal = document.getElementById('proposalPieChart').getContext('2d');
+    const proposalCounts = {{ proposal_status_counts|safe }};
+
+    new Chart(ctxProposal, {
+        type: 'doughnut',
+        data: {
+            labels: ['Pending', 'Approved', 'Declined'],
+            datasets: [{
+                label: 'Proposal Status',
+                data: [
+                    proposalCounts.pending,
+                    proposalCounts.approved,
+                    proposalCounts.rejected
+                ],
+                backgroundColor: [
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(255, 99, 132, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(255, 99, 132, 1)'
+                ],
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '40%',
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 14 }, color: '#333' } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.raw}`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Proposal Status Overview',
+                    font: { size: 18, weight: 'bold' },
+                    color: '#333'
+                }
+            }
+        }
+    });
+
+    // -----------------------------
+    // Approved Amounts Chart
+    // -----------------------------
+    const ctxApproved = document.getElementById('approvedAmountChart').getContext('2d');
+    const approvedLabels = {{ scatter_labels|safe }};
+    const approvedData = {{ scatter_data|safe }};
+
+    new Chart(ctxApproved, {
+        type: 'bar',
+        data: {
+            labels: approvedLabels,
+            datasets: [{
+                label: 'Approved Amount (₱)',
+                data: approvedData,
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Approved Amount (₱)' },
+                    ticks: { precision: 0 }
+                },
+                y: { title: { display: true, text: 'Project Title' } }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `₱${Number(context.raw).toLocaleString()}`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Approved Project Budgets for {{ report_year }}',
+                    font: { size: 18, weight: 'bold' }
+                }
+            }
+        }
+    });
+
+    // -----------------------------
+    // Line Chart: Project Assignment Status
+    // -----------------------------
+    const ctxStep = document.getElementById('stepChart').getContext('2d');
+    const stepLabels = {{ step_labels|safe }};
+    const pendingCounts = {{ pending_counts|safe }};
+    const completedCounts = {{ completed_counts|safe }};
+
+    new Chart(ctxStep, {
+        type: 'line',
+        data: {
+            labels: stepLabels,
+            datasets: [
+                {
+                    label: 'Pending',
+                    data: pendingCounts,
+                    borderColor: 'rgba(255, 206, 86, 1)',
+                    backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                },
+                {
+                    label: 'Completed',
+                    data: completedCounts,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { title: { display: true, text: 'Project (Year)' } },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Assignment Status' },
+                    ticks: { precision: 0 } // integers only
+                }
+            },
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw}`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Project Assignment Status for {{ report_year }}',
+                    font: { size: 18, weight: 'bold' }
+                }
+            }
+        }
+    });
+
+    // -----------------------------
+    // PDF Export with Filter Parameters
+    // -----------------------------
+    document.getElementById('financialPdfExportLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Get current filter values
+        const year = document.getElementById('year').value;
+        const startDate = document.getElementById('start_date').value;
+        const endDate = document.getElementById('end_date').value;
+        const status = document.getElementById('status').value;
+        const municipality = document.getElementById('municipality').value;
+        
+        // Build URL with parameters
+        let url = '{% url "financial_summary_pdf" %}?';
+        const params = [];
+        
+        if (year) params.push('year=' + encodeURIComponent(year));
+        if (startDate) params.push('start_date=' + encodeURIComponent(startDate));
+        if (endDate) params.push('end_date=' + encodeURIComponent(endDate));
+        if (status) params.push('status=' + encodeURIComponent(status));
+        if (municipality) params.push('municipality=' + encodeURIComponent(municipality));
+        
+        url += params.join('&');
+        
+        // Open in new tab
+        window.open(url, '_blank');
+    });
+
+    document.getElementById('proposalPdfExportLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Get current filter values
+        const year = document.getElementById('year').value;
+        const startDate = document.getElementById('start_date').value;
+        const endDate = document.getElementById('end_date').value;
+        const status = document.getElementById('status').value;
+        const municipality = document.getElementById('municipality').value;
+        
+        // Build URL with parameters
+        let url = '{% url "proposal_status_pdf" %}?';
+        const params = [];
+        
+        if (year) params.push('year=' + encodeURIComponent(year));
+        if (startDate) params.push('start_date=' + encodeURIComponent(startDate));
+        if (endDate) params.push('end_date=' + encodeURIComponent(endDate));
+        if (status) params.push('status=' + encodeURIComponent(status));
+        if (municipality) params.push('municipality=' + encodeURIComponent(municipality));
+        
+        url += params.join('&');
+        
+        // Open in new tab
+        window.open(url, '_blank');
+    });
+
+    document.getElementById('approvedProjectsPdfExportLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Get current filter values
+        const year = document.getElementById('year').value;
+        const startDate = document.getElementById('start_date').value;
+        const endDate = document.getElementById('end_date').value;
+        const status = document.getElementById('status').value;
+        const municipality = document.getElementById('municipality').value;
+        
+        // Build URL with parameters
+        let url = '{% url "approved_projects_pdf" %}?';
+        const params = [];
+        
+        if (year) params.push('year=' + encodeURIComponent(year));
+        if (startDate) params.push('start_date=' + encodeURIComponent(startDate));
+        if (endDate) params.push('end_date=' + encodeURIComponent(endDate));
+        if (status) params.push('status=' + encodeURIComponent(status));
+        if (municipality) params.push('municipality=' + encodeURIComponent(municipality));
+        
+        url += params.join('&');
+        
+        // Open in new tab
+        window.open(url, '_blank');
+    });
+
+</script>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "proponent/base.html" %}
+{% load static %}
+
+{% block title %}Add Extension Request{% endblock %}
+{% block nav-extension-requests %}active-nav{% endblock %}
+{% block page-title %}Add Extension Request{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+<div class="container mt-2" x-data="{ selectedProposal: null }">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white
+                        {% if message.tags == 'success' %} bg-green-500
+                        {% elif message.tags == 'error' %} bg-red-500
+                        {% else %} bg-blue-500 {% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="max-w-2xl mx-auto bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Submit Extension Request</h2>
+
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+
+            <!-- Proposal/Project Selection -->
+            <div>
+                <label for="proposal" class="block text-sm font-medium text-gray-700 mb-2">
+                    Select Proposal/Project *
+                </label>
+                <select id="proposal" name="proposal" required
+                        x-model="selectedProposal"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Choose a proposal/project...</option>
+                    {% for proposal in proposals %}
+                    <option value="{{ proposal.id }}">
+                        {{ proposal.title }}
+                        {% if proposal.project %}
+                            (Project: {{ proposal.project.title }})
+                        {% endif %}
+                        - Status: {{ proposal.status|title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Reason -->
+            <div>
+                <label for="reason" class="block text-sm font-medium text-gray-700 mb-2">
+                    Reason for Extension *
+                </label>
+                <textarea id="reason" name="reason" rows="4" required
+                          placeholder="Please explain why you need an extension..."
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+            </div>
+
+            <!-- Requested Extension Days -->
+            <div>
+                <label for="requested_extension_days" class="block text-sm font-medium text-gray-700 mb-2">
+                    Requested Extension (Days) *
+                </label>
+                <input type="number" id="requested_extension_days" name="requested_extension_days"
+                       min="1" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            </div>
+
+            <!-- Attachment -->
+            <div>
+                <label for="attachment" class="block text-sm font-medium text-gray-700 mb-2">
+                    Supporting Document (Optional)
+                </label>
+                <input type="file" id="attachment" name="attachment"
+                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                <p class="mt-1 text-sm text-gray-500">
+                    Upload a supporting document (PDF, DOC, DOCX, JPG, PNG). Max 10MB.
+                </p>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div class="flex justify-end space-x-4">
+                <a href="{% url 'proponent_extension_requests_url' %}"
+                   class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    <i class="fas fa-paper-plane mr-2"></i>Submit Request
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

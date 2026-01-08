@@ -1,0 +1,2222 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" x-data="{ 
+    darkMode: localStorage.getItem('darkMode') === 'true',
+    simpleMode: localStorage.getItem('simpleMode') === 'true'
+}" :class="{ 'dark': darkMode, 'simple-mode': simpleMode }">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin Dashboard{% endblock %}</title>
+
+  <!-- Tailwind CSS via CDN with dark mode -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+
+  <!-- Alpine.js for interactivity -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  
+  <!-- Apply dark mode immediately to prevent flash -->
+  <script>
+    if (localStorage.getItem('darkMode') === 'true') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+
+  <!-- Material Icons CDN -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="{% static 'img/dost.png' %}" type="image/png">
+
+  {% block styles %}{% endblock %}
+
+  <style>
+    /* Hide Alpine.js elements until initialized to prevent flash/blink */
+    [x-cloak] { display: none !important; }
+    
+    .active-nav {
+      background-color: #ffffff33;
+      color: #ffffff !important;
+      font-weight: 600;
+    }
+    .hover-card:hover {
+      transform: translateY(-5px) scale(1.02);
+    }
+    /* Ensure sidebar is visible on desktop */
+    @media (min-width: 768px) {
+      #sidebar {
+        transform: translateX(0) !important;
+        position: static !important;
+      }
+    }
+    
+    /* Dark mode overrides */
+    html.dark { background-color: #111827; }
+    html.dark body { background-color: #111827; color: #e5e7eb; }
+    .dark .bg-gray-50 { background-color: #1f2937 !important; }
+    .dark .bg-white { background-color: #374151 !important; }
+    .dark .bg-gray-100 { background-color: #4b5563 !important; }
+    .dark .bg-gray-200 { background-color: #6b7280 !important; }
+    
+    /* Text colors for dark mode */
+    .dark .text-gray-900 { color: #f9fafb !important; }
+    .dark .text-gray-800 { color: #f3f4f6 !important; }
+    .dark .text-gray-700 { color: #e5e7eb !important; }
+    .dark .text-gray-600 { color: #d1d5db !important; }
+    .dark .text-gray-500 { color: #9ca3af !important; }
+    .dark .text-gray-400 { color: #9ca3af !important; }
+    .dark p, .dark span, .dark div, .dark td, .dark th, .dark label, .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 { color: #e5e7eb; }
+    .dark a:not(.bg-blue-500):not(.bg-green-500):not(.bg-red-500) { color: #93c5fd; }
+    
+    /* Borders for dark mode */
+    .dark .border-gray-100, .dark .border-gray-200, .dark .border-gray-300 { border-color: #4b5563 !important; }
+    .dark .border { border-color: #4b5563 !important; }
+    
+    /* Shadows for dark mode */
+    .dark .shadow, .dark .shadow-md, .dark .shadow-lg { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important; }
+    
+    /* Tables for dark mode */
+    .dark table { background-color: #374151; }
+    .dark table thead { background-color: #1f2937 !important; }
+    .dark table thead th { color: #e5e7eb !important; }
+    .dark table tbody td { color: #d1d5db !important; border-color: #4b5563 !important; }
+    .dark table tbody tr { background-color: #374151; }
+    .dark table tbody tr:hover { background-color: #4b5563 !important; }
+    .dark table tbody tr:nth-child(even) { background-color: #3b4252; }
+    
+    /* Form inputs for dark mode */
+    .dark input, .dark select, .dark textarea { 
+      background-color: #1f2937 !important; 
+      color: #e5e7eb !important; 
+      border-color: #4b5563 !important; 
+    }
+    .dark input::placeholder, .dark textarea::placeholder { color: #9ca3af !important; }
+    
+    /* Cards and panels */
+    .dark .rounded-lg, .dark .rounded-xl, .dark .rounded-2xl { background-color: #374151; }
+    
+    /* Header */
+    .dark header { background-color: #1f2937 !important; }
+    
+    /* Modals */
+    .dark .fixed.inset-0 .bg-white { background-color: #374151 !important; }
+    
+    /* DataTables dark mode */
+    .dark .dataTables_wrapper { color: #e5e7eb !important; }
+    .dark .dataTables_wrapper .dataTables_length, 
+    .dark .dataTables_wrapper .dataTables_filter,
+    .dark .dataTables_wrapper .dataTables_info,
+    .dark .dataTables_wrapper .dataTables_paginate { color: #e5e7eb !important; }
+    .dark .dataTables_wrapper .dataTables_paginate .paginate_button { color: #e5e7eb !important; }
+    .dark .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: #4b5563 !important; color: #fff !important; }
+    
+    /* ========================================
+       TOOLTIP STYLES
+       ======================================== */
+    .tooltip-container {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .tooltip-container .tooltip-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: #6b7280;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: help;
+      margin-left: 4px;
+      transition: background-color 0.2s;
+    }
+    
+    .tooltip-container:hover .tooltip-icon {
+      background-color: #374151;
+    }
+    
+    .tooltip-container .tooltip-text {
+      visibility: hidden;
+      opacity: 0;
+      position: fixed;
+      bottom: auto;
+      top: auto;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #1f2937;
+      color: #e5e7eb;
+      text-align: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: nowrap;
+      z-index: 9999;
+      transition: opacity 0.3s, visibility 0.3s;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      border: 1px solid #4b5563;
+      max-width: 300px;
+      word-wrap: break-word;
+      white-space: normal;
+      pointer-events: none;
+    }
+    
+    .tooltip-container .tooltip-text::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: #1f2937;
+    }
+    
+    .tooltip-container:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+    
+    /* Dark mode tooltips */
+    .dark .tooltip-container .tooltip-text {
+      background-color: #374151;
+      color: #e5e7eb;
+      border-color: #6b7280;
+    }
+    
+    .dark .tooltip-container .tooltip-text::after {
+      border-top-color: #374151;
+    }
+    
+    /* Mobile-friendly tooltips */
+    @media (max-width: 768px) {
+      .tooltip-container .tooltip-text {
+        white-space: normal;
+        max-width: 280px;
+        word-wrap: break-word;
+        font-size: 11px;
+        padding: 6px 10px;
+      }
+    }
+    
+    /* ========================================
+       SIMPLE MODE STYLES
+       Comprehensive simplified interface for non-techy users
+       Focus on essential actions only
+       ======================================== */
+    
+    /* Hide all advanced/complex features */
+    .simple-mode .advanced-feature,
+    .simple-mode .chart-section,
+    .simple-mode .gis-map-section,
+    .simple-mode .analytics-section,
+    .simple-mode .tech-info,
+    .simple-mode .ip-address,
+    .simple-mode .json-data,
+    .simple-mode .bulk-actions,
+    .simple-mode .mass-delete-section,
+    .simple-mode .export-dropdown,
+    .simple-mode .filter-advanced {
+      display: none !important;
+    }
+    
+    /* Show simple mode notice */
+    .simple-mode .simple-mode-notice {
+      display: block !important;
+    }
+    
+    /* Hide complex table columns in simple mode */
+    .simple-mode .column-advanced {
+      display: none !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: LARGER, MORE READABLE TEXT
+       ======================================== */
+    .simple-mode {
+      font-size: 16px !important;
+    }
+    
+    .simple-mode .text-xs { font-size: 0.9rem !important; }
+    .simple-mode .text-sm { font-size: 1rem !important; }
+    .simple-mode .text-base { font-size: 1.1rem !important; }
+    .simple-mode .text-lg { font-size: 1.25rem !important; }
+    .simple-mode .text-xl { font-size: 1.5rem !important; }
+    .simple-mode .text-2xl { font-size: 1.75rem !important; }
+    .simple-mode .text-3xl { font-size: 2rem !important; }
+    
+    /* ========================================
+       SIMPLE MODE: BIGGER BUTTONS & CLICKABLE AREAS
+       ======================================== */
+    .simple-mode button,
+    .simple-mode .btn,
+    .simple-mode a.bg-blue-500,
+    .simple-mode a.bg-green-500,
+    .simple-mode a.bg-red-500,
+    .simple-mode a.bg-yellow-500,
+    .simple-mode input[type="submit"] {
+      padding: 12px 20px !important;
+      font-size: 1rem !important;
+      min-height: 44px !important;
+      border-radius: 8px !important;
+    }
+    
+    .simple-mode table button,
+    .simple-mode table .btn,
+    .simple-mode table a {
+      padding: 8px 14px !important;
+      font-size: 0.95rem !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: CLEANER TABLE LAYOUT
+       ======================================== */
+    .simple-mode table td, 
+    .simple-mode table th { 
+      padding: 1rem 1.25rem !important; 
+      font-size: 0.95rem !important;
+    }
+    
+    .simple-mode table th {
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.05em !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: BETTER STAT CARDS
+       ======================================== */
+    .simple-mode .stat-card,
+    .simple-mode .bg-gradient-to-r {
+      padding: 1.5rem !important;
+      border-radius: 12px !important;
+    }
+    
+    .simple-mode .stat-card h3,
+    .simple-mode .stat-card .text-3xl,
+    .simple-mode .stat-card .text-2xl {
+      font-size: 2.25rem !important;
+      font-weight: 800 !important;
+    }
+    
+    .simple-mode .stat-card p,
+    .simple-mode .stat-card span {
+      font-size: 1rem !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: CLEANER FORMS
+       ======================================== */
+    .simple-mode input[type="text"],
+    .simple-mode input[type="email"],
+    .simple-mode input[type="password"],
+    .simple-mode input[type="number"],
+    .simple-mode input[type="date"],
+    .simple-mode input[type="search"],
+    .simple-mode select,
+    .simple-mode textarea {
+      padding: 14px 16px !important;
+      font-size: 1rem !important;
+      border-radius: 8px !important;
+      min-height: 48px !important;
+    }
+    
+    .simple-mode label {
+      font-size: 1rem !important;
+      font-weight: 600 !important;
+      margin-bottom: 8px !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: SIMPLIFIED NAVIGATION
+       ======================================== */
+    .simple-mode .sidebar-advanced-item {
+      display: none !important;
+    }
+    
+    .simple-mode #sidebar a {
+      padding: 14px 20px !important;
+      font-size: 1rem !important;
+    }
+    
+    .simple-mode #sidebar .material-icons {
+      font-size: 24px !important;
+      margin-right: 12px !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: REDUCED VISUAL NOISE
+       ======================================== */
+    .simple-mode .shadow-lg { box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
+    .simple-mode .border { border-width: 2px !important; }
+    
+    /* Hide decorative elements */
+    .simple-mode .decorative,
+    .simple-mode .pattern-bg,
+    .simple-mode .hover-card::before {
+      display: none !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: BETTER SPACING
+       ======================================== */
+    .simple-mode .p-4 { padding: 1.25rem !important; }
+    .simple-mode .p-6 { padding: 1.75rem !important; }
+    .simple-mode .gap-4 { gap: 1.25rem !important; }
+    .simple-mode .gap-6 { gap: 1.75rem !important; }
+    .simple-mode .mb-4 { margin-bottom: 1.25rem !important; }
+    .simple-mode .mb-6 { margin-bottom: 1.75rem !important; }
+    
+    /* ========================================
+       SIMPLE MODE: CLEARER ACTION COLORS
+       ======================================== */
+    .simple-mode .bg-green-500,
+    .simple-mode .bg-green-600 {
+      background-color: #059669 !important;
+    }
+    
+    .simple-mode .bg-red-500,
+    .simple-mode .bg-red-600 {
+      background-color: #DC2626 !important;
+    }
+    
+    .simple-mode .bg-blue-500,
+    .simple-mode .bg-blue-600 {
+      background-color: #2563EB !important;
+    }
+    
+    .simple-mode .bg-yellow-500,
+    .simple-mode .bg-yellow-600 {
+      background-color: #D97706 !important;
+    }
+    
+    /* Simple mode floating indicator */
+    .simple-mode-indicator {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .simple-mode-indicator:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 25px rgba(16, 185, 129, 0.5);
+    }
+    
+    /* ========================================
+       SIMPLE MODE: HIDE TECHNICAL COLUMNS
+       ======================================== */
+    .simple-mode .column-advanced,
+    .simple-mode .column-technical,
+    .simple-mode .column-id,
+    .simple-mode .column-timestamp {
+      display: none !important;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: GUIDED ACTION TOOLTIPS
+       ======================================== */
+    .simple-mode [data-tooltip] {
+      position: relative;
+    }
+    
+    .simple-mode [data-tooltip]:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #1f2937;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 9999;
+      margin-bottom: 5px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    
+    .simple-mode [data-tooltip]:hover::before {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #1f2937;
+      margin-bottom: -7px;
+      z-index: 9999;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: STATUS COLORS LEGEND
+       ======================================== */
+    .status-legend {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 9998;
+      font-size: 13px;
+      max-width: 220px;
+    }
+    
+    .simple-mode .status-legend {
+      display: block;
+    }
+    
+    .status-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .status-legend-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    
+    /* ========================================
+       SIMPLE MODE: BREADCRUMB STYLES
+       ======================================== */
+    .breadcrumb {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 16px;
+      padding: 10px 16px;
+      background: #f3f4f6;
+      border-radius: 8px;
+    }
+    
+    .simple-mode .breadcrumb {
+      display: flex;
+    }
+    
+    .breadcrumb a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+    
+    .breadcrumb .separator {
+      color: #9ca3af;
+    }
+    
+    .breadcrumb .current {
+      color: #374151;
+      font-weight: 600;
+    }
+    
+    /* ========================================
+       QUICK HELP PANEL
+       ======================================== */
+    .quick-help-btn {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9998;
+      transition: transform 0.2s;
+    }
+    
+    .simple-mode .quick-help-btn {
+      display: flex;
+    }
+    
+    .quick-help-btn:hover {
+      transform: scale(1.1);
+    }
+    
+    .quick-help-panel {
+      position: fixed;
+      bottom: 80px;
+      left: 20px;
+      width: 320px;
+      max-height: 400px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      z-index: 9999;
+      overflow: hidden;
+      display: none;
+    }
+    
+    .quick-help-panel.show {
+      display: block;
+    }
+    
+    .quick-help-header {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      padding: 16px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .quick-help-content {
+      padding: 16px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    
+    .help-item {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #f3f4f6;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .help-item:hover {
+      background: #e5e7eb;
+    }
+    
+    .help-item-title {
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    
+    .help-item-desc {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    
+    @media print {
+      /* Hide navigation, sidebar, buttons, and non-essential elements */
+      #sidebar,
+      #overlay,
+      header,
+      nav,
+      .no-print,
+      button:not(.print-include),
+      .btn:not(.print-include),
+      a.btn:not(.print-include),
+      [x-data] > button,
+      #menu-btn,
+      #notifBtn,
+      #notifDropdown {
+        display: none !important;
+      }
+      
+      /* Reset body and main content for print */
+      body {
+        background: white !important;
+        color: black !important;
+        font-size: 11pt !important;
+        line-height: 1.4 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      
+      /* Make main content full width */
+      .min-h-screen,
+      .flex-1,
+      main {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      
+      /* Content area adjustments */
+      .p-6 {
+        padding: 10px !important;
+      }
+      
+      /* Ensure tables don't break awkwardly */
+      table {
+        page-break-inside: auto !important;
+      }
+      tr {
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+      }
+      thead {
+        display: table-header-group !important;
+      }
+      
+      /* Cards and sections */
+      .bg-white,
+      .shadow,
+      .shadow-lg,
+      .shadow-md,
+      .rounded-xl,
+      .rounded-lg {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+        page-break-inside: avoid !important;
+      }
+      
+      /* Ensure charts/graphs print with colors */
+      canvas {
+        max-width: 100% !important;
+        height: auto !important;
+      }
+      
+      /* Page setup */
+      @page {
+        size: A4 landscape;
+        margin: 1cm;
+      }
+      
+      /* Print header - add TaskPro branding */
+      body::before {
+        content: "TaskPro - DOST Biliran Project Monitoring System";
+        display: block;
+        text-align: center;
+        font-size: 16pt;
+        font-weight: bold;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #0072CE;
+      }
+      
+      /* Print footer with date */
+      body::after {
+        content: "Printed on: " attr(data-print-date);
+        display: block;
+        text-align: right;
+        font-size: 9pt;
+        color: #666;
+        margin-top: 20px;
+        padding-top: 10px;
+        border-top: 1px solid #ddd;
+      }
+      
+      /* Ensure gradient backgrounds print as solid colors */
+      .bg-gradient-to-br,
+      .bg-gradient-to-r {
+        background: #0072CE !important;
+      }
+      
+      /* Links should show URL */
+      a[href]:after {
+        content: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans">
+  <!-- Hidden CSRF token for AJAX requests -->
+  <form id="csrf-form" style="display: none;">
+    {% csrf_token %}
+  </form>
+
+  <div class="min-h-screen flex flex-col md:flex-row">
+    <!-- Sidebar - Fixed on mobile, static on desktop -->
+    <aside id="sidebar" 
+        class="w-64 bg-[#0072CE] text-white shadow-lg flex flex-col fixed md:static bottom-0 top-0 left-0 -translate-x-full md:translate-x-0 transition-transform z-50 overflow-y-auto md:min-h-screen">
+      <!-- Header -->
+      <div class="flex items-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 shadow-md border-b border-blue-700">
+        <a href="{% url 'administrator_dashboard_url' %}" class="flex items-center hover:opacity-90 transition-opacity duration-200">
+          <img src="{% static 'img/dost.png' %}" 
+               alt="DOST Logo" 
+               class="h-12 w-12 rounded-full border-2 border-white shadow-lg transition-transform duration-300 hover:scale-110 cursor-pointer">
+          <div class="ml-3 flex flex-col">
+            <span class="text-2xl font-extrabold text-white drop-shadow-md leading-tight">TaskPro</span>
+            <span class="text-xs text-blue-200 font-medium">DOST Biliran</span>
+          </div>
+        </a>
+      </div>
+
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-4 py-6 flex flex-col space-y-2">
+
+          <!-- Profile Section -->
+        <div class="flex flex-col items-center mb-2">
+            {% if user.profile_picture %}
+                <img src="{{ user.profile_picture.url }}" 
+                    alt="{{ user.get_full_name }}" 
+                    class="h-16 w-16 rounded-full border-2 border-[#0072CE] shadow-md object-cover">
+            {% else %}
+                <img src="https://via.placeholder.com/64" 
+                    alt="User" 
+                    class="h-16 w-16 rounded-full border-2 border-[#0072CE] shadow-md object-cover">
+            {% endif %}
+            <span class="mt-3 font-semibold text-white text-center">{{ user.get_full_name }}</span>
+            <span class="text-gray-300 text-sm text-center">
+                {% if user.role == 'admin' %}
+                    Administrator
+                {% elif user.role == 'staff' %}
+                    Staff
+                {% else %}
+                    {{ user.role|capfirst }}
+                {% endif %}
+            </span>
+
+        </div>
+
+        <a href="{% url 'administrator_dashboard_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_dashboard_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">dashboard</span>
+            <span class="ml-3 font-medium">Dashboard</span>
+        </a>
+
+        <a href="{% url 'administrator_users_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_users_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">people</span>
+            <span class="ml-3 font-medium">Users</span>
+        </a>
+
+        <a href="{% url 'administrator_budgets_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_budgets_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">account_balance_wallet</span>
+            <span class="ml-3 font-medium">Budget Allocation</span>
+        </a>
+
+        <a href="{% url 'administrator_proposals_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_proposals_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">description</span>
+            <span class="ml-3 font-medium">Proposals</span>
+        </a>
+
+        <a href="{% url 'administrator_projects_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_projects_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">work_outline</span>
+            <span class="ml-3 font-medium">Projects</span>
+        </a>
+
+        <a href="{% url 'administrator_extension_requests_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if 'extension_requests' in request.resolver_match.url_name %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">schedule</span>
+            <span class="ml-3 font-medium">Extension Requests</span>
+        </a>
+
+        <a href="{% url 'administrator_task_list_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_task_list_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">assignment_ind</span>
+            <span class="ml-3 font-medium">Staff Assignments</span>
+        </a>
+
+        <a href="{% url 'administrator_communication_hub_url' %}"
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if 'communication_hub' in request.resolver_match.url_name or 'messages' in request.resolver_match.url_name or 'group_chats' in request.resolver_match.url_name or 'announcements' in request.resolver_match.url_name %}
+            bg-white text-[#0072CE]
+          {% else %}
+            text-white hover:bg-white hover:text-[#0072CE]
+          {% endif %}">
+            <span class="material-icons">chat</span>
+            <span class="ml-3 font-medium">Communication Hub</span>
+        </a>
+   
+        <a href="{% url 'administrator_reports_url' %}"
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_reports_url' %}
+            bg-white text-[#0072CE]
+          {% else %}
+            text-white hover:bg-white hover:text-[#0072CE]
+          {% endif %}">
+            <span class="material-icons">description</span>
+            <span class="ml-3 font-medium">Reports</span>
+        </a>
+
+        <!-- Calendar - New Feature -->
+        <a href="{% url 'administrator_calendar_url' %}"
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if 'calendar' in request.resolver_match.url_name %}
+            bg-white text-[#0072CE]
+          {% else %}
+            text-white hover:bg-white hover:text-[#0072CE]
+          {% endif %}">
+            <span class="material-icons">calendar_month</span>
+            <span class="ml-3 font-medium">Calendar</span>
+        </a>
+
+        <a href="{% url 'administrator_system_health_url' %}"
+          class="sidebar-advanced-item flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if 'system_health' in request.resolver_match.url_name %}
+            bg-white text-[#0072CE]
+          {% else %}
+            text-white hover:bg-white hover:text-[#0072CE]
+          {% endif %}">
+            <span class="material-icons">health_and_safety</span>
+            <span class="ml-3 font-medium">System Health</span>
+        </a>
+
+        <a href="{% url 'administrator_forms_url' %}"
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_forms_url' %}
+            bg-white text-[#0072CE]
+          {% else %}
+            text-white hover:bg-white hover:text-[#0072CE]
+          {% endif %}">
+            <span class="material-icons">folder</span>
+            <span class="ml-3 font-medium">Forms</span>
+        </a>
+
+        <a href="{% url 'administrator_settings_url' %}" 
+          class="flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_settings_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">settings</span>
+            <span class="ml-3 font-medium">Settings</span>
+        </a>
+
+        <a href="{% url 'administrator_audit_logs_url' %}" 
+          class="sidebar-advanced-item flex items-center px-3 py-2 rounded-lg transition duration-200
+          {% if request.resolver_match.url_name == 'administrator_audit_logs_url' %} 
+            bg-white text-[#0072CE] 
+          {% else %} 
+            text-white hover:bg-white hover:text-[#0072CE] 
+          {% endif %}">
+            <span class="material-icons">history</span>
+            <span class="ml-3 font-medium">Audit Logs</span>
+        </a>
+
+
+        <a href="{% url 'logout_url' %}" 
+            class="flex items-center px-3 py-2 rounded-lg transition duration-200
+            {% if request.resolver_match.url_name == 'logout_url' %} 
+              bg-white text-[#0072CE] 
+            {% else %} 
+              text-white hover:bg-white hover:text-[#0072CE] 
+            {% endif %}">
+              <span class="material-icons">logout</span>
+              <span class="ml-3 font-medium">Logout</span>
+          </a>
+      </nav>
+    </aside>
+
+    <!-- Overlay for Mobile -->
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden md:hidden z-40"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0">
+      <!-- Top Navbar -->
+      <header class="bg-white shadow-md rounded-b-xl px-6 py-4 flex justify-between items-center sticky top-0 z-30 transition-all duration-300">
+        <div class="flex items-center space-x-4">
+          <button id="menu-btn" class="md:hidden text-gray-700 focus:outline-none hover:text-[#0072CE] transition">
+            <span class="material-icons">menu</span>
+          </button>
+          <h1 class="text-xl font-bold text-gray-800">
+            {% block page-title %}Dashboard{% endblock %}
+          </h1>
+
+        </div>
+        <div class="flex items-center gap-4">
+          <!-- Global Search -->
+          <div class="relative hidden md:block">
+            <div class="relative">
+              <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+              <input type="text" id="globalSearchInput" 
+                     placeholder="Search projects, users..."
+                     class="w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-[#0072CE] dark:text-gray-200"
+                     autocomplete="off">
+            </div>
+            <div id="globalSearchResults" class="hidden absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-80 overflow-y-auto z-50"></div>
+          </div>
+
+          <!-- Simple Mode Toggle - More prominent with tooltip -->
+          <button @click="simpleMode = !simpleMode; localStorage.setItem('simpleMode', simpleMode)" 
+                  class="px-3 py-2 rounded-lg transition flex items-center gap-2 font-medium text-sm"
+                  :class="simpleMode ? 'bg-green-500 text-white shadow-md hover:bg-green-600' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'"
+                  :title="simpleMode ? 'Exit Simple Mode (show charts & advanced features)' : 'Enable Simple Mode (hide charts for easier viewing)'">
+              <span class="material-icons text-lg" x-text="simpleMode ? 'visibility' : 'auto_awesome'"></span>
+              <span class="hidden sm:inline" x-text="simpleMode ? 'Exit Simple Mode' : 'Simple Mode'"></span>
+          </button>
+
+          <!-- Dark Mode Toggle -->
+          <button @click="darkMode = !darkMode; localStorage.setItem('darkMode', darkMode)" 
+                  class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                  :title="darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+              <span class="material-icons text-gray-600 dark:text-gray-300" x-text="darkMode ? 'light_mode' : 'dark_mode'"></span>
+          </button>
+
+          <!-- Notification Bell -->
+          <div class="relative">
+            <button id="notifBtn" class="relative">
+              <span class="material-icons text-gray-600 dark:text-gray-300 cursor-pointer hover:text-[#0072CE] transition">
+                  notifications
+              </span>
+
+              {% if unread_notifications_count > 0 %}
+              <span
+                  class="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  {{ unread_notifications_count }}
+              </span>
+              {% endif %}
+            </button>
+
+            <!-- Dropdown -->
+            <div id="notifDropdown"
+                class="hidden absolute right-0 mt-3 w-80 max-w-[calc(100vw-2rem)] bg-white shadow-lg rounded-lg border z-[9999]">
+
+
+              <div class="px-4 py-2 border-b font-semibold text-gray-700 flex justify-between items-center">
+                  <span>Notifications</span>
+                  <div class="flex items-center space-x-2">
+                      {% if notifications_list %}
+                      <button type="button" 
+                          onclick="clearAllNotifications()"
+                          class="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50"
+                          title="Clear all notifications">
+                          Clear All
+                      </button>
+                      {% endif %}
+                      <button type="button" 
+                          onclick="closeNotifications()"
+                          class="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                          title="Close notifications">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                      </button>
+                  </div>
+              </div>
+
+             <ul class="max-h-80 overflow-y-auto">
+                  {% if notifications_list %}
+                      {% for notif in notifications_list %}
+                      <li class="border-b relative group">
+                          <div class="flex items-start gap-3 p-3 hover:bg-gray-50 {% if notif.status == 'unread' %}bg-blue-50{% endif %} cursor-pointer"
+                               onclick="handleNotificationClick({{ notif.id }}, '{{ notif.link|default:'' }}', this)">
+                            
+                              <span class="material-icons text-[#0072CE] text-lg">circle_notifications</span>
+
+                              <div class="flex-1">
+                                  <p class="text-sm text-gray-700">{{ notif.message }}</p>
+                                  <p class="text-xs text-gray-500">{{ notif.timestamp|date:"M d, Y h:i A" }}</p>
+                              </div>
+
+                              {% if notif.status == 'unread' %}
+                              <span class="w-2 h-2 bg-red-500 rounded-full mt-1"></span>
+                              {% endif %}
+                              
+                              <!-- Delete notification button -->
+                              <button type="button" 
+                                  onclick="event.stopPropagation(); deleteNotification({{ notif.id }}, this)"
+                                  class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                                  title="Delete notification">
+                                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                  </svg>
+                              </button>
+                          </div>
+                      </li>
+                      {% endfor %}
+                  {% else %}
+                      <li class="p-4 text-center text-gray-500 text-sm">No notifications</li>
+                  {% endif %}
+              </ul>
+          </div>
+        </div>
+
+<script>
+    const notifBtn = document.getElementById("notifBtn");
+    const notifDropdown = document.getElementById("notifDropdown");
+
+    notifBtn.addEventListener("click", () => {
+        notifDropdown.classList.toggle("hidden");
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener("click", function (event) {
+        if (!notifBtn.contains(event.target) && !notifDropdown.contains(event.target)) {
+            notifDropdown.classList.add("hidden");
+        }
+    });
+
+    // Delete notification function
+    function deleteNotification(notifId, buttonElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        fetch(`/notifications/delete/${notifId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove the notification from the list
+                const listItem = buttonElement.closest('li');
+                listItem.remove();
+                
+                // Update notification count
+                const badge = document.querySelector('#notifBtn .bg-red-500');
+                if (badge) {
+                    const currentCount = parseInt(badge.textContent) || 0;
+                    if (currentCount <= 1) {
+                        badge.remove();
+                    } else {
+                        badge.textContent = currentCount - 1;
+                    }
+                }
+                
+                // Check if no more notifications
+                const remainingItems = document.querySelectorAll('#notifDropdown li');
+                if (remainingItems.length === 0) {
+                    document.querySelector('#notifDropdown ul').innerHTML = 
+                        '<li class="p-4 text-center text-gray-500 text-sm">No notifications</li>';
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Clear all notifications function
+    function clearAllNotifications() {
+        if (!confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
+            return;
+        }
+        
+        fetch('/notifications/clear-all/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update notification count
+                const badge = document.getElementById('notifBadge');
+                if (badge) {
+                    badge.remove();
+                }
+                
+                // Clear the notification list
+                document.querySelector('#notifDropdown ul').innerHTML = 
+                    '<li class="p-4 text-center text-gray-500 text-sm">No notifications</li>';
+                    
+                // Hide the clear all button
+                const clearButton = document.querySelector('button[onclick="clearAllNotifications()"]');
+                if (clearButton) {
+                    clearButton.style.display = 'none';
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Close notifications dropdown
+    function closeNotifications() {
+        const notifDropdown = document.getElementById("notifDropdown");
+        notifDropdown.classList.add("hidden");
+    }
+
+    // Handle notification click - mark as read and redirect
+    function handleNotificationClick(notificationId, link, element) {
+        // Mark notification as read via AJAX
+        fetch(`/notifications/read/${notificationId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update UI - remove unread indicator
+                const unreadDot = element.querySelector('.bg-red-500');
+                if (unreadDot) {
+                    unreadDot.remove();
+                }
+                
+                // Remove blue background
+                element.classList.remove('bg-blue-50');
+                
+                // Update notification count
+                const badge = document.getElementById('notifBadge');
+                if (badge) {
+                    const currentCount = parseInt(badge.textContent) || 0;
+                    if (currentCount > 1) {
+                        badge.textContent = currentCount - 1;
+                    } else {
+                        badge.remove();
+                    }
+                }
+            }
+        })
+        .catch(error => console.error('Error marking notification as read:', error))
+        .finally(() => {
+            // Always redirect, even if marking as read fails
+            if (link) {
+                window.location.href = link;
+            }
+            closeNotifications();
+        });
+    }
+
+    // Tooltip helper functions
+    function createTooltip(element, text) {
+        const container = document.createElement('span');
+        container.className = 'tooltip-container';
+        
+        const icon = document.createElement('span');
+        icon.className = 'tooltip-icon';
+        icon.textContent = '?';
+        
+        const tooltip = document.createElement('span');
+        tooltip.className = 'tooltip-text';
+        tooltip.textContent = text;
+        
+        container.appendChild(icon);
+        container.appendChild(tooltip);
+        
+        // Position tooltip above the icon when shown
+        icon.addEventListener('mouseenter', function(e) {
+            const rect = icon.getBoundingClientRect();
+            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.top = (rect.top - 10) + 'px';
+            tooltip.style.transform = 'translateX(-50%) translateY(-100%)';
+        });
+        
+        element.appendChild(container);
+        return container;
+    }
+
+    function addTooltipToElement(selector, text) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+            if (!element.querySelector('.tooltip-container')) {
+                createTooltip(element, text);
+            }
+        });
+    }
+
+</script>
+
+      </header>
+
+      <!-- Page Content -->
+      <div class="p-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Sidebar JS -->
+  <script>
+    const menuBtn = document.getElementById("menu-btn");
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("overlay");
+
+    menuBtn.addEventListener("click", () => {
+      sidebar.classList.toggle("-translate-x-full");
+      overlay.classList.toggle("hidden");
+    });
+
+    overlay.addEventListener("click", () => {
+      sidebar.classList.add("-translate-x-full");
+      overlay.classList.add("hidden");
+    });
+  </script>
+
+  <!-- Simple Mode Indicator (clickable to toggle off) -->
+  <div x-show="simpleMode" x-cloak 
+       @click="simpleMode = false; localStorage.setItem('simpleMode', 'false')"
+       class="simple-mode-indicator"
+       title="Click to exit Simple Mode">
+    <span class="material-icons text-sm">visibility</span>
+    <span>Simple Mode</span>
+    <span class="ml-1 text-xs opacity-75">(Click to exit)</span>
+  </div>
+
+  <!-- Status Colors Legend (Only in Simple Mode) -->
+  <div class="status-legend" x-show="simpleMode" x-cloak>
+    <div class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <span class="material-icons text-sm">palette</span>
+      Status Colors Guide
+    </div>
+    <div class="status-legend-item">
+      <span class="status-dot bg-yellow-500"></span>
+      <span>Pending / Waiting</span>
+    </div>
+    <div class="status-legend-item">
+      <span class="status-dot bg-blue-500"></span>
+      <span>In Progress / Active</span>
+    </div>
+    <div class="status-legend-item">
+      <span class="status-dot bg-green-500"></span>
+      <span>Approved / Completed</span>
+    </div>
+    <div class="status-legend-item">
+      <span class="status-dot bg-red-500"></span>
+      <span>Rejected / Overdue</span>
+    </div>
+    <div class="status-legend-item">
+      <span class="status-dot bg-gray-400"></span>
+      <span>Inactive / Cancelled</span>
+    </div>
+  </div>
+
+  <!-- Quick Help Button & Panel (Only in Simple Mode) -->
+  <button class="quick-help-btn" onclick="toggleHelpPanel()" title="Need Help?">
+    <span class="material-icons">help_outline</span>
+  </button>
+
+  <div id="quickHelpPanel" class="quick-help-panel">
+    <div class="quick-help-header">
+      <span><span class="material-icons text-sm mr-1">help</span> Quick Help</span>
+      <button onclick="toggleHelpPanel()" class="text-white hover:text-gray-200">
+        <span class="material-icons text-sm">close</span>
+      </button>
+    </div>
+    <div class="quick-help-content">
+      <div class="help-item" onclick="window.location.href='{% url 'administrator_dashboard_url' %}'">
+        <div class="help-item-title">📊 Dashboard</div>
+        <div class="help-item-desc">View system overview, stats, and quick actions</div>
+      </div>
+      <div class="help-item" onclick="window.location.href='{% url 'administrator_proposals_url' %}'">
+        <div class="help-item-title">📝 Managing Proposals</div>
+        <div class="help-item-desc">Review, approve, or reject submitted proposals</div>
+      </div>
+      <div class="help-item" onclick="window.location.href='{% url 'administrator_projects_url' %}'">
+        <div class="help-item-title">📁 Managing Projects</div>
+        <div class="help-item-desc">Track ongoing projects and their progress</div>
+      </div>
+      <div class="help-item" onclick="window.location.href='{% url 'administrator_users_url' %}'">
+        <div class="help-item-title">👥 Managing Users</div>
+        <div class="help-item-desc">Add, edit, or deactivate user accounts</div>
+      </div>
+      <div class="help-item" onclick="window.location.href='{% url 'administrator_extension_requests_url' %}'">
+        <div class="help-item-title">⏰ Extension Requests</div>
+        <div class="help-item-desc">Review requests for project deadline extensions</div>
+      </div>
+      <div class="help-item" onclick="window.location.href='{% url 'administrator_communication_hub_url' %}'">
+        <div class="help-item-title">💬 Communication</div>
+        <div class="help-item-desc">Send messages and announcements</div>
+      </div>
+      <div class="help-item">
+        <div class="help-item-title">❓ Need More Help?</div>
+        <div class="help-item-desc">Contact IT Support: support@dost.gov.ph</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleHelpPanel() {
+      const panel = document.getElementById('quickHelpPanel');
+      panel.classList.toggle('show');
+    }
+    
+    // Close help panel when clicking outside
+    document.addEventListener('click', function(e) {
+      const panel = document.getElementById('quickHelpPanel');
+      const btn = document.querySelector('.quick-help-btn');
+      if (panel && !panel.contains(e.target) && !btn.contains(e.target)) {
+        panel.classList.remove('show');
+      }
+    });
+  </script>
+
+  <!-- Enhanced Confirmation Dialog -->
+  <div id="confirmDialog" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black bg-opacity-50" x-data>
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 transform transition-all">
+      <div class="flex items-center gap-3 mb-4">
+        <div id="confirmIcon" class="w-12 h-12 rounded-full flex items-center justify-center bg-red-100">
+          <span class="material-icons text-red-600 text-2xl">warning</span>
+        </div>
+        <div>
+          <h3 id="confirmTitle" class="text-lg font-bold text-gray-800">Confirm Action</h3>
+          <p id="confirmMessage" class="text-sm text-gray-600">Are you sure?</p>
+        </div>
+      </div>
+      <div id="confirmDetails" class="bg-gray-50 rounded-lg p-3 mb-4 text-sm text-gray-700 hidden"></div>
+      <div class="flex justify-end gap-3">
+        <button onclick="closeConfirmDialog()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+          Cancel
+        </button>
+        <button id="confirmBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Document Preview Modal -->
+  <div id="documentPreviewModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black bg-opacity-70">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] mx-4 flex flex-col">
+      <div class="flex items-center justify-between p-4 border-b border-gray-200">
+        <h3 id="previewTitle" class="text-lg font-semibold text-gray-800 truncate flex-1">Document Preview</h3>
+        <div class="flex items-center gap-2">
+          <a id="previewDownload" href="#" download class="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition" title="Download">
+            <span class="material-icons">download</span>
+          </a>
+          <a id="previewNewTab" href="#" target="_blank" class="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition" title="Open in new tab">
+            <span class="material-icons">open_in_new</span>
+          </a>
+          <button onclick="closeDocumentPreview()" class="p-2 text-gray-600 hover:text-red-600 hover:bg-gray-100 rounded-lg transition" title="Close">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+      </div>
+      <div id="previewContent" class="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50 min-h-[400px]">
+        <!-- Preview content will be inserted here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Digital Signature Modal -->
+  <div id="signatureModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <span class="material-icons text-blue-600">draw</span>
+          Digital Signature
+        </h3>
+        <button onclick="closeSignatureModal()" class="text-gray-400 hover:text-gray-600">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+      <form id="signatureForm" action="{% url 'create_digital_signature_url' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" id="sig_content_type" name="content_type" value="">
+        <input type="hidden" id="sig_object_id" name="object_id" value="">
+        <input type="hidden" id="sig_signature_data" name="signature_data" value="">
+        
+        <p class="text-sm text-gray-600 mb-4">
+          By signing below, you confirm that you have reviewed and approved this document.
+        </p>
+        
+        <!-- Signature Method Tabs -->
+        <div class="flex border-b border-gray-200 mb-4">
+          <button type="button" onclick="switchSignatureTab('draw')" id="tabDraw" class="flex-1 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+            <span class="material-icons text-sm align-middle mr-1">edit</span>Draw Signature
+          </button>
+          <button type="button" onclick="switchSignatureTab('upload')" id="tabUpload" class="flex-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+            <span class="material-icons text-sm align-middle mr-1">upload</span>Upload Image
+          </button>
+        </div>
+        
+        <!-- Draw Signature Tab -->
+        <div id="signatureDrawTab">
+          <div class="border-2 border-dashed border-gray-300 rounded-lg mb-4 bg-white">
+            <canvas id="signaturePad" width="360" height="150" class="w-full cursor-crosshair"></canvas>
+          </div>
+          <div class="flex justify-between items-center mb-4">
+            <button type="button" onclick="clearSignature()" class="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1">
+              <span class="material-icons text-sm">refresh</span>
+              Clear
+            </button>
+            <span class="text-xs text-gray-400">Sign inside the box</span>
+          </div>
+        </div>
+        
+        <!-- Upload Signature Tab -->
+        <div id="signatureUploadTab" class="hidden">
+          <div class="border-2 border-dashed border-gray-300 rounded-lg mb-4 p-6 text-center bg-gray-50">
+            <input type="file" name="signature_image" id="signatureImageInput" accept="image/*" class="hidden" onchange="previewSignatureImage(this)">
+            <div id="signatureImagePreview" class="hidden mb-3">
+              <img id="signatureImageImg" src="" alt="Signature Preview" class="max-h-32 mx-auto rounded">
+            </div>
+            <label for="signatureImageInput" class="cursor-pointer">
+              <span class="material-icons text-4xl text-gray-400 mb-2">cloud_upload</span>
+              <p class="text-sm text-gray-600">Click to upload your signature image</p>
+              <p class="text-xs text-gray-400 mt-1">PNG, JPG up to 2MB (transparent background recommended)</p>
+            </label>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Remarks (Optional)</label>
+          <textarea name="remarks" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Add any comments..."></textarea>
+        </div>
+        
+        <div class="flex gap-3">
+          <button type="button" onclick="closeSignatureModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+            Cancel
+          </button>
+          <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
+            <span class="material-icons text-sm">check</span>
+            Sign Document
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Signature Tab Switching
+    function switchSignatureTab(tab) {
+      const drawTab = document.getElementById('signatureDrawTab');
+      const uploadTab = document.getElementById('signatureUploadTab');
+      const tabDraw = document.getElementById('tabDraw');
+      const tabUpload = document.getElementById('tabUpload');
+      
+      if (tab === 'draw') {
+        drawTab.classList.remove('hidden');
+        uploadTab.classList.add('hidden');
+        tabDraw.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabDraw.classList.remove('text-gray-500');
+        tabUpload.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabUpload.classList.add('text-gray-500');
+      } else {
+        drawTab.classList.add('hidden');
+        uploadTab.classList.remove('hidden');
+        tabUpload.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabUpload.classList.remove('text-gray-500');
+        tabDraw.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabDraw.classList.add('text-gray-500');
+      }
+    }
+    
+    function previewSignatureImage(input) {
+      const preview = document.getElementById('signatureImagePreview');
+      const img = document.getElementById('signatureImageImg');
+      
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          img.src = e.target.result;
+          preview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+  </script>
+
+  <script>
+    // Digital Signature Pad
+    let signatureCanvas, signatureCtx, isDrawing = false, lastX = 0, lastY = 0;
+    
+    function initSignaturePad() {
+      signatureCanvas = document.getElementById('signaturePad');
+      if (!signatureCanvas) return;
+      
+      signatureCtx = signatureCanvas.getContext('2d');
+      signatureCtx.strokeStyle = '#1e40af';
+      signatureCtx.lineWidth = 2;
+      signatureCtx.lineCap = 'round';
+      
+      signatureCanvas.addEventListener('mousedown', startDrawing);
+      signatureCanvas.addEventListener('mousemove', draw);
+      signatureCanvas.addEventListener('mouseup', stopDrawing);
+      signatureCanvas.addEventListener('mouseout', stopDrawing);
+      
+      // Touch events
+      signatureCanvas.addEventListener('touchstart', handleTouchStart);
+      signatureCanvas.addEventListener('touchmove', handleTouchMove);
+      signatureCanvas.addEventListener('touchend', stopDrawing);
+    }
+    
+    function startDrawing(e) {
+      isDrawing = true;
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    }
+    
+    function draw(e) {
+      if (!isDrawing) return;
+      signatureCtx.beginPath();
+      signatureCtx.moveTo(lastX, lastY);
+      signatureCtx.lineTo(e.offsetX, e.offsetY);
+      signatureCtx.stroke();
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    }
+    
+    function handleTouchStart(e) {
+      e.preventDefault();
+      const rect = signatureCanvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      isDrawing = true;
+      lastX = touch.clientX - rect.left;
+      lastY = touch.clientY - rect.top;
+    }
+    
+    function handleTouchMove(e) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const rect = signatureCanvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      signatureCtx.beginPath();
+      signatureCtx.moveTo(lastX, lastY);
+      signatureCtx.lineTo(x, y);
+      signatureCtx.stroke();
+      lastX = x;
+      lastY = y;
+    }
+    
+    function stopDrawing() {
+      isDrawing = false;
+    }
+    
+    function clearSignature() {
+      if (signatureCtx) {
+        signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+      }
+    }
+    
+    function openSignatureModal(contentType, objectId) {
+      document.getElementById('sig_content_type').value = contentType;
+      document.getElementById('sig_object_id').value = objectId;
+      document.getElementById('signatureModal').classList.remove('hidden');
+      document.getElementById('signatureModal').classList.add('flex');
+      initSignaturePad();
+      clearSignature();
+    }
+    
+    function closeSignatureModal() {
+      document.getElementById('signatureModal').classList.add('hidden');
+      document.getElementById('signatureModal').classList.remove('flex');
+    }
+    
+    // Capture signature on form submit
+    document.getElementById('signatureForm')?.addEventListener('submit', function(e) {
+      const data = signatureCanvas.toDataURL('image/png');
+      document.getElementById('sig_signature_data').value = data;
+    });
+    
+    document.addEventListener('DOMContentLoaded', initSignaturePad);
+  </script>
+
+  <script>
+    // Document Preview Functions
+    function previewDocument(url, filename) {
+      const modal = document.getElementById('documentPreviewModal');
+      const content = document.getElementById('previewContent');
+      const title = document.getElementById('previewTitle');
+      const download = document.getElementById('previewDownload');
+      const newTab = document.getElementById('previewNewTab');
+      
+      title.textContent = filename || 'Document Preview';
+      download.href = url;
+      newTab.href = url;
+      
+      // Get extension from filename first, then from URL
+      let extension = '';
+      if (filename && filename.includes('.')) {
+        extension = filename.split('.').pop().toLowerCase();
+      } else if (url && url.includes('.')) {
+        extension = url.split('.').pop().toLowerCase().split('?')[0]; // Remove query params
+      }
+      
+      console.log('Preview - URL:', url, 'Filename:', filename, 'Extension:', extension);
+      
+      // Clear previous content
+      content.innerHTML = '<div class="text-center"><span class="material-icons animate-spin text-4xl text-blue-500">hourglass_empty</span><p class="mt-2 text-gray-500">Loading...</p></div>';
+      
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(extension)) {
+        // Image preview
+        const img = new Image();
+        img.onload = function() {
+          content.innerHTML = '';
+          img.className = 'max-w-full max-h-full object-contain rounded-lg shadow-lg';
+          content.appendChild(img);
+        };
+        img.onerror = function() {
+          content.innerHTML = '<div class="text-center text-red-500"><span class="material-icons text-4xl">error</span><p class="mt-2">Failed to load image</p></div>';
+        };
+        img.src = url;
+      } else if (extension === 'pdf') {
+        // PDF preview - use iframe with object fallback
+        content.innerHTML = `
+          <object data="${url}" type="application/pdf" class="w-full h-full min-h-[500px] rounded-lg">
+            <iframe src="${url}" class="w-full h-full min-h-[500px] rounded-lg" frameborder="0">
+              <p class="text-center text-gray-500 mt-4">
+                Your browser doesn't support PDF preview. 
+                <a href="${url}" download class="text-blue-600 hover:underline">Download the file</a> instead.
+              </p>
+            </iframe>
+          </object>
+        `;
+      } else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp'].includes(extension)) {
+        // Office documents - try multiple approaches
+        const fullUrl = window.location.origin + url;
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        if (isLocalhost) {
+          // For localhost, we can't use Google Docs viewer - show download option
+          content.innerHTML = `
+            <div class="text-center py-8">
+              <span class="material-icons text-6xl text-blue-500 mb-4">description</span>
+              <p class="text-lg font-medium text-gray-700 mb-2">${filename || 'Office Document'}</p>
+              <p class="text-gray-500 mb-2">File type: ${extension.toUpperCase()}</p>
+              <p class="text-gray-400 text-sm mb-6">Office document preview requires the file to be hosted online.<br>In local development, please download to view.</p>
+              <div class="flex justify-center gap-3">
+                <a href="${url}" download class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                  <span class="material-icons">download</span>
+                  Download File
+                </a>
+                <a href="${url}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                  <span class="material-icons">open_in_new</span>
+                  Open in Browser
+                </a>
+              </div>
+            </div>
+          `;
+        } else {
+          // For production, try Google Docs viewer
+          content.innerHTML = `
+            <iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=true" 
+                    class="w-full h-full min-h-[500px] rounded-lg" 
+                    frameborder="0"
+                    onload="this.style.opacity=1"
+                    onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8\\'><span class=\\'material-icons text-4xl text-gray-400\\'>error</span><p class=\\'mt-2 text-gray-500\\'>Could not load preview</p><a href=\\'${url}\\' download class=\\'mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg\\'>Download Instead</a></div>'">
+            </iframe>
+          `;
+        }
+      } else if (['txt', 'csv', 'json', 'xml', 'html', 'css', 'js', 'py', 'md'].includes(extension)) {
+        // Text files - fetch and display
+        fetch(url)
+          .then(response => response.text())
+          .then(text => {
+            content.innerHTML = `<pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-auto max-h-[500px] text-sm font-mono whitespace-pre-wrap">${escapeHtml(text)}</pre>`;
+          })
+          .catch(err => {
+            content.innerHTML = `<div class="text-center text-red-500"><span class="material-icons text-4xl">error</span><p class="mt-2">Failed to load file</p></div>`;
+          });
+      } else if (['mp4', 'webm', 'ogg', 'mov'].includes(extension)) {
+        // Video files
+        content.innerHTML = `
+          <video controls class="max-w-full max-h-full rounded-lg shadow-lg">
+            <source src="${url}" type="video/${extension === 'mov' ? 'mp4' : extension}">
+            Your browser doesn't support video playback.
+          </video>
+        `;
+      } else if (['mp3', 'wav', 'ogg', 'flac'].includes(extension)) {
+        // Audio files
+        content.innerHTML = `
+          <div class="text-center py-8">
+            <span class="material-icons text-6xl text-purple-500 mb-4">audiotrack</span>
+            <p class="text-lg font-medium text-gray-700 mb-4">${filename || 'Audio File'}</p>
+            <audio controls class="w-full max-w-md mx-auto">
+              <source src="${url}" type="audio/${extension}">
+              Your browser doesn't support audio playback.
+            </audio>
+          </div>
+        `;
+      } else {
+        // Unsupported format - show helpful message
+        content.innerHTML = `
+          <div class="text-center py-8">
+            <span class="material-icons text-6xl text-gray-400 mb-4">insert_drive_file</span>
+            <p class="text-lg font-medium text-gray-700 mb-2">${filename || 'Document'}</p>
+            <p class="text-gray-500 mb-1">File type: ${extension ? extension.toUpperCase() : 'Unknown'}</p>
+            <p class="text-gray-400 text-sm mb-6">Preview is not available for this file type</p>
+            <div class="flex justify-center gap-3">
+              <a href="${url}" download class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                <span class="material-icons">download</span>
+                Download File
+              </a>
+              <a href="${url}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                <span class="material-icons">open_in_new</span>
+                Open in Browser
+              </a>
+            </div>
+          </div>
+        `;
+      }
+      
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function closeDocumentPreview() {
+      const modal = document.getElementById('documentPreviewModal');
+      const content = document.getElementById('previewContent');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      content.innerHTML = '';
+    }
+    
+    // Close on escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeDocumentPreview();
+        closeConfirmDialog();
+      }
+    });
+    
+    // Close on backdrop click
+    document.getElementById('documentPreviewModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeDocumentPreview();
+      }
+    });
+  </script>
+
+  <script>
+    // Enhanced Confirmation Dialog
+    let confirmCallback = null;
+    
+    function showConfirmDialog(options) {
+      const dialog = document.getElementById('confirmDialog');
+      const title = document.getElementById('confirmTitle');
+      const message = document.getElementById('confirmMessage');
+      const details = document.getElementById('confirmDetails');
+      const icon = document.getElementById('confirmIcon');
+      const btn = document.getElementById('confirmBtn');
+      
+      title.textContent = options.title || 'Confirm Action';
+      message.textContent = options.message || 'Are you sure you want to proceed?';
+      
+      if (options.details) {
+        details.innerHTML = options.details;
+        details.classList.remove('hidden');
+      } else {
+        details.classList.add('hidden');
+      }
+      
+      // Set icon and colors based on type
+      const type = options.type || 'danger';
+      if (type === 'danger') {
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-red-100';
+        icon.innerHTML = '<span class="material-icons text-red-600 text-2xl">warning</span>';
+        btn.className = 'px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition';
+      } else if (type === 'warning') {
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-yellow-100';
+        icon.innerHTML = '<span class="material-icons text-yellow-600 text-2xl">help_outline</span>';
+        btn.className = 'px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition';
+      } else if (type === 'success') {
+        icon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-green-100';
+        icon.innerHTML = '<span class="material-icons text-green-600 text-2xl">check_circle</span>';
+        btn.className = 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition';
+      }
+      
+      btn.textContent = options.confirmText || 'Confirm';
+      confirmCallback = options.onConfirm;
+      
+      dialog.classList.remove('hidden');
+      dialog.classList.add('flex');
+    }
+    
+    function closeConfirmDialog() {
+      const dialog = document.getElementById('confirmDialog');
+      dialog.classList.add('hidden');
+      dialog.classList.remove('flex');
+      confirmCallback = null;
+    }
+    
+    document.getElementById('confirmBtn').addEventListener('click', function() {
+      if (confirmCallback) {
+        confirmCallback();
+      }
+      closeConfirmDialog();
+    });
+
+    // Global Search Functionality
+    function initGlobalSearch() {
+      const searchInput = document.getElementById('globalSearchInput');
+      const searchResults = document.getElementById('globalSearchResults');
+      
+      if (!searchInput || !searchResults) {
+        console.log('Global search elements not found');
+        return;
+      }
+      
+      let searchTimeout;
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+          searchResults.classList.add('hidden');
+          return;
+        }
+        
+        // Show loading state
+        searchResults.innerHTML = '<div class="px-4 py-3 text-gray-500 text-sm flex items-center gap-2"><span class="material-icons animate-spin text-sm">hourglass_empty</span> Searching...</div>';
+        searchResults.classList.remove('hidden');
+        
+        searchTimeout = setTimeout(() => {
+          fetch(`/api/search/?q=${encodeURIComponent(query)}`)
+            .then(r => {
+              if (!r.ok) throw new Error('Search failed');
+              return r.json();
+            })
+            .then(data => {
+              if (data.results && data.results.length > 0) {
+                searchResults.innerHTML = data.results.map(r => `
+                  <a href="${r.url}" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <div class="flex items-center gap-2">
+                      <span class="material-icons text-sm text-gray-400">${r.icon}</span>
+                      <div>
+                        <div class="font-medium text-gray-800 dark:text-gray-200">${r.title}</div>
+                        <div class="text-xs text-gray-500">${r.type}</div>
+                      </div>
+                    </div>
+                  </a>
+                `).join('');
+                searchResults.classList.remove('hidden');
+              } else {
+                searchResults.innerHTML = '<div class="px-4 py-3 text-gray-500 text-sm">No results found</div>';
+                searchResults.classList.remove('hidden');
+              }
+            })
+            .catch(err => {
+              console.error('Search error:', err);
+              searchResults.innerHTML = '<div class="px-4 py-3 text-red-500 text-sm">Search error. Please try again.</div>';
+              searchResults.classList.remove('hidden');
+            });
+        }, 300);
+      });
+      
+      // Close on outside click
+      document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+          searchResults.classList.add('hidden');
+        }
+      });
+    }
+    
+    document.addEventListener('DOMContentLoaded', initGlobalSearch);
+
+    // @Mentions Functionality
+    function initMentions(textarea) {
+      if (!textarea || textarea.dataset.mentionsInit) return;
+      textarea.dataset.mentionsInit = 'true';
+      
+      let dropdown = null;
+      let searchTimeout = null;
+      
+      function createDropdown() {
+        dropdown = document.createElement('div');
+        dropdown.className = 'absolute bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto z-50 hidden';
+        dropdown.style.minWidth = '200px';
+        textarea.parentElement.style.position = 'relative';
+        textarea.parentElement.appendChild(dropdown);
+        return dropdown;
+      }
+      
+      textarea.addEventListener('input', function(e) {
+        const value = this.value;
+        const cursorPos = this.selectionStart;
+        const textBeforeCursor = value.substring(0, cursorPos);
+        
+        // Check for @ trigger
+        const match = textBeforeCursor.match(/@(\w*)$/);
+        
+        if (match) {
+          const query = match[1];
+          
+          if (!dropdown) dropdown = createDropdown();
+          
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+            fetch(`/api/mentions/search/?q=${encodeURIComponent(query)}`)
+              .then(r => r.json())
+              .then(data => {
+                if (data.users && data.users.length > 0) {
+                  dropdown.innerHTML = data.users.map(u => `
+                    <div class="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2"
+                         data-username="${u.username}" data-fullname="${u.full_name}" data-userid="${u.id}">
+                      <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-medium">
+                        ${u.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div class="text-sm font-medium text-gray-800 dark:text-gray-200">${u.full_name}</div>
+                        <div class="text-xs text-gray-500">@${u.username}</div>
+                      </div>
+                    </div>
+                  `).join('');
+                  dropdown.classList.remove('hidden');
+                  
+                  // Add click handlers
+                  dropdown.querySelectorAll('[data-username]').forEach(item => {
+                    item.onclick = function() {
+                      insertMention(textarea, match[0], this.dataset.username, cursorPos);
+                      dropdown.classList.add('hidden');
+                    };
+                  });
+                } else {
+                  dropdown.classList.add('hidden');
+                }
+              });
+          }, 200);
+        } else if (dropdown) {
+          dropdown.classList.add('hidden');
+        }
+      });
+      
+      // Hide dropdown on blur
+      textarea.addEventListener('blur', function() {
+        setTimeout(() => {
+          if (dropdown) dropdown.classList.add('hidden');
+        }, 200);
+      });
+    }
+    
+    function insertMention(textarea, match, username, cursorPos) {
+      const value = textarea.value;
+      const before = value.substring(0, cursorPos - match.length);
+      const after = value.substring(cursorPos);
+      textarea.value = before + '@' + username + ' ' + after;
+      textarea.focus();
+      const newPos = before.length + username.length + 2;
+      textarea.setSelectionRange(newPos, newPos);
+    }
+    
+    // Auto-init mentions on textareas with data-mentions attribute
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('[data-mentions]').forEach(initMentions);
+    });
+  </script>
+
+  <!-- Notification Polling Script -->
+  <script>
+    // Poll for new notifications every 30 seconds
+    function pollNotifications() {
+      fetch('/notifications/count/')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Update notification badge
+            const badge = document.getElementById('notifBadge');
+            const notifBtn = document.getElementById('notifBtn');
+            
+            if (data.unread_count > 0) {
+              if (badge) {
+                badge.textContent = data.unread_count;
+              } else if (notifBtn) {
+                // Create badge if it doesn't exist
+                const newBadge = document.createElement('span');
+                newBadge.id = 'notifBadge';
+                newBadge.className = 'absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full';
+                newBadge.textContent = data.unread_count;
+                notifBtn.appendChild(newBadge);
+              }
+            } else if (badge) {
+              badge.remove();
+            }
+            
+            // Update notification dropdown content
+            const notifDropdown = document.getElementById('notifDropdown');
+            if (notifDropdown && data.notifications.length > 0) {
+              const listContainer = notifDropdown.querySelector('.notification-list');
+              if (listContainer) {
+                let html = '';
+                data.notifications.forEach(notif => {
+                  const statusClass = notif.status === 'unread' ? 'bg-blue-50' : '';
+                  const unreadDot = notif.status === 'unread' ? '<span class="w-2 h-2 bg-blue-500 rounded-full"></span>' : '';
+                  html += `
+                    <div class="notification-item px-4 py-3 hover:bg-gray-50 cursor-pointer ${statusClass}" 
+                         data-notif-id="${notif.id}"
+                         onclick="handleNotificationClick(${notif.id}, '${notif.link}')">
+                      <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                          <p class="text-sm text-gray-800">${notif.message}</p>
+                          <p class="text-xs text-gray-500 mt-1">${notif.timestamp}</p>
+                        </div>
+                        ${unreadDot}
+                      </div>
+                    </div>
+                  `;
+                });
+                listContainer.innerHTML = html;
+              }
+            }
+          }
+        })
+        .catch(err => console.log('Notification poll error:', err));
+    }
+    
+    // Start polling after page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initial poll after 5 seconds
+      setTimeout(pollNotifications, 5000);
+      // Then poll every 30 seconds
+      setInterval(pollNotifications, 30000);
+    });
+  </script>
+
+  <!-- Session Timeout Warning Script -->
+  <script>
+    (function() {
+      const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+      const WARNING_BEFORE = 5 * 60 * 1000;   // Show warning 5 minutes before timeout
+      let lastActivity = Date.now();
+      let warningShown = false;
+      let warningModal = null;
+      
+      // Track user activity
+      const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+      
+      function resetTimer() {
+        lastActivity = Date.now();
+        if (warningShown && warningModal) {
+          warningModal.remove();
+          warningShown = false;
+        }
+      }
+      
+      activityEvents.forEach(event => {
+        document.addEventListener(event, resetTimer, { passive: true });
+      });
+      
+      function createWarningModal() {
+        const modal = document.createElement('div');
+        modal.id = 'sessionWarningModal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+        modal.innerHTML = `
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4">
+            <div class="flex items-center mb-4">
+              <span class="material-icons text-yellow-500 text-3xl mr-3">warning</span>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Session Expiring Soon</h3>
+            </div>
+            <p class="text-gray-600 dark:text-gray-300 mb-4">
+              Your session will expire in <span id="countdownTimer" class="font-bold text-red-600">5:00</span> due to inactivity.
+            </p>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">
+              Click "Stay Logged In" to continue your session, or you will be automatically logged out.
+            </p>
+            <div class="flex justify-end space-x-3">
+              <a href="/" class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                Logout Now
+              </a>
+              <button id="stayLoggedInBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Stay Logged In
+              </button>
+            </div>
+          </div>
+        `;
+        return modal;
+      }
+      
+      function showWarning() {
+        if (warningShown) return;
+        warningShown = true;
+        warningModal = createWarningModal();
+        document.body.appendChild(warningModal);
+        
+        // Countdown timer
+        let remainingSeconds = WARNING_BEFORE / 1000;
+        const timerEl = document.getElementById('countdownTimer');
+        
+        const countdown = setInterval(() => {
+          remainingSeconds--;
+          const mins = Math.floor(remainingSeconds / 60);
+          const secs = remainingSeconds % 60;
+          if (timerEl) {
+            timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+          }
+          
+          if (remainingSeconds <= 0) {
+            clearInterval(countdown);
+            window.location.href = '/';
+          }
+        }, 1000);
+        
+        // Stay logged in button
+        document.getElementById('stayLoggedInBtn').addEventListener('click', function() {
+          clearInterval(countdown);
+          // Make a request to keep session alive
+          fetch('/notifications/count/', { credentials: 'same-origin' })
+            .then(() => {
+              resetTimer();
+            });
+        });
+      }
+      
+      // Check for inactivity every 30 seconds
+      setInterval(() => {
+        const elapsed = Date.now() - lastActivity;
+        const timeUntilExpiry = SESSION_TIMEOUT - elapsed;
+        
+        if (timeUntilExpiry <= WARNING_BEFORE && !warningShown) {
+          showWarning();
+        }
+        
+        if (elapsed >= SESSION_TIMEOUT) {
+          window.location.href = '/';
+        }
+      }, 30000);
+    })();
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

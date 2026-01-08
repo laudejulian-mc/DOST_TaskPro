@@ -1,0 +1,223 @@
+{% extends 'administrator/base.html' %}
+{% load static %}
+{% block title %}Account Settings{% endblock %}
+
+{% block page_title %}Profile Settings{% endblock %}
+
+{% block content %}
+
+<div class="w-full bg-white p-8 rounded-2xl shadow-md"
+     x-data="{ openModal: false }">
+
+    <h2 class="text-2xl font-semibold mb-6">Edit Profile</h2>
+
+    <!-- Flash Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 p-3 rounded-lg text-white 
+                {% if message.tags == 'success' %}
+                    bg-green-500
+                {% elif message.tags == 'error' %}
+                    bg-red-500
+                {% elif message.tags == 'warning' %}
+                    bg-yellow-500
+                {% else %}
+                    bg-blue-500
+                {% endif %}
+            ">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Profile Picture -->
+        <div class="flex flex-col sm:flex-row items-center gap-6">
+            {% if user.profile_picture %}
+                <img src="{{ user.profile_picture.url }}" alt="Profile" class="w-24 h-24 rounded-full object-cover border">
+            {% else %}
+                <img src="{% static 'images/default-avatar.png' %}" alt="Profile" class="w-24 h-24 rounded-full object-cover border">
+            {% endif %}
+            <div class="w-full sm:w-auto">
+                <label class="block font-medium text-gray-700">Change Profile Picture</label>
+                <input type="file" name="profile_picture" class="mt-1 w-full text-sm text-gray-500">
+            </div>
+        </div>
+
+        <!-- Name Fields -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+            <div>
+                <label class="block font-medium text-gray-700">First Name</label>
+                <input type="text" name="first_name" value="{{ user.first_name }}" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-medium text-gray-700">Middle Name</label>
+                <input type="text" name="middle_name" value="{{ user.middle_name }}" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-medium text-gray-700">Last Name</label>
+                <input type="text" name="last_name" value="{{ user.last_name }}" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-medium text-gray-700">Suffix</label>
+                <input type="text" name="suffix" value="{{ user.suffix }}" class="w-full p-2 border rounded-lg">
+            </div>
+        </div>
+
+        <!-- Sex, Civil Status, Contact, Email -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+            <div>
+                <label class="block font-medium text-gray-700">Sex</label>
+                <select name="sex" class="w-full p-2 border rounded-lg">
+                    <option value="">Select Sex</option>
+                    <option value="male" {% if user.sex == "male" %}selected{% endif %}>Male</option>
+                    <option value="female" {% if user.sex == "female" %}selected{% endif %}>Female</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block font-medium text-gray-700">Civil Status</label>
+                <select name="civil_status" class="w-full p-2 border rounded-lg">
+                    <option value="">Select Status</option>
+                    <option value="single" {% if user.civil_status == "single" %}selected{% endif %}>Single</option>
+                    <option value="married" {% if user.civil_status == "married" %}selected{% endif %}>Married</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block font-medium text-gray-700">Contact Number</label>
+                <input type="text" name="contact_number" value="{{ user.contact_number }}" class="w-full p-2 border rounded-lg">
+            </div>
+
+            <div>
+                <label class="block font-medium text-gray-700">Email</label>
+                <input type="email" name="email" value="{{ user.email }}" class="w-full p-2 border rounded-lg">
+            </div>
+        </div>
+
+        <!-- Address -->
+        <div>
+            <label class="block font-medium text-gray-700">Address</label>
+            <textarea name="address" class="w-full p-2 border rounded-lg h-15">{{ user.address }}</textarea>
+        </div>
+
+        <!-- Digital Signature Section -->
+        <div class="border-t pt-6 mt-6">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <span class="material-icons text-green-600">draw</span>
+                Digital Signature
+            </h3>
+            <p class="text-sm text-gray-600 mb-4">Your digital signature will be included in PDF reports you export.</p>
+            
+            <div class="flex flex-col sm:flex-row items-start gap-6">
+                <!-- Current Signature Preview -->
+                <div class="flex-shrink-0">
+                    <label class="block font-medium text-gray-700 mb-2">Current Signature</label>
+                    <div id="currentSignaturePreview" class="w-48 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                        {% if user_signature and user_signature.signature_image %}
+                            <img src="{{ user_signature.signature_image.url }}" alt="Your Signature" class="max-w-full max-h-full object-contain">
+                        {% elif user_signature and user_signature.signature_data %}
+                            <img src="{{ user_signature.signature_data }}" alt="Your Signature" class="max-w-full max-h-full object-contain">
+                        {% else %}
+                            <span class="text-gray-400 text-sm">No signature set</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Upload New Signature -->
+                <div class="flex-grow">
+                    <label class="block font-medium text-gray-700 mb-2">Upload New Signature</label>
+                    <input type="file" name="signature_image" accept="image/*" 
+                           class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                           onchange="previewSignature(this)">
+                    <p class="text-xs text-gray-500 mt-1">Upload a PNG or JPG image of your signature (transparent background recommended)</p>
+                    
+                    <!-- Preview of new upload -->
+                    <div id="newSignaturePreview" class="hidden mt-3">
+                        <p class="text-sm text-gray-600 mb-1">Preview:</p>
+                        <img id="signaturePreviewImg" src="" alt="Preview" class="max-w-48 max-h-24 border rounded-lg">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Or Draw Signature -->
+            <div class="mt-4">
+                <button type="button" onclick="openSignatureModal('settings', '{{ user.id }}')"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition">
+                    <span class="material-icons text-sm">edit</span>
+                    Draw Signature
+                </button>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-4">
+            <button type="button"
+                @click="openModal = true"
+                class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg transition">
+                Change Password
+            </button>
+            <button type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition">
+                Save Changes
+            </button>
+        </div>
+    </form>
+
+    <!-- Change Password Modal -->
+    <div
+        x-show="openModal"
+        x-transition
+        x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+    >
+        <div
+            @click.away="openModal = false"
+            class="bg-white rounded-xl shadow-lg p-6 w-full max-w-md"
+        >
+            <h3 class="text-xl font-semibold mb-4">Change Password</h3>
+            <form method="POST" action="{% url 'administrator_change_password_url' %}" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block font-medium text-gray-700">Old Password</label>
+                    <input type="password" name="old_password" class="w-full p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700">New Password</label>
+                    <input type="password" name="new_password1" class="w-full p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700">Confirm New Password</label>
+                    <input type="password" name="new_password2" class="w-full p-2 border rounded-lg" required>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-4">
+                    <button type="button"
+                        @click="openModal = false"
+                        class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                        Update Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewSignature(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('signaturePreviewImg').src = e.target.result;
+            document.getElementById('newSignaturePreview').classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
+{% endblock %}

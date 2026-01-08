@@ -1,0 +1,132 @@
+{% extends 'staff/base.html' %}
+{% load static %}
+
+{% block title %}{{ chat.name }} - DOST Project Management{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">{{ chat.name }}</h1>
+                        {% if chat.project %}
+                        <p class="mt-1 text-sm text-gray-500">{{ chat.project.project_title }}</p>
+                        {% endif %}
+                    </div>
+                    <a href="{% url 'staff_group_chats_url' %}"
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200">
+                        <span class="material-icons text-sm mr-2">arrow_back</span>
+                        Back to Group Chats
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Chat Messages -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-lg shadow-sm border h-96 flex flex-col">
+                    <!-- Messages Area -->
+                    <div id="messagesContainer" class="flex-1 p-4 overflow-y-auto space-y-4">
+                        {% for message in chat_messages %}
+                        <div class="flex {% if message.sender == user %}justify-end{% else %}justify-start{% endif %}">
+                            <div class="max-w-xs lg:max-w-md {% if message.sender == user %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-900{% endif %} rounded-lg px-4 py-2">
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <span class="text-xs font-medium">{{ message.sender.get_full_name }}</span>
+                                    {% if message.sender == user %}
+                                    <span class="text-xs opacity-75">(You)</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-sm whitespace-pre-wrap">{{ message.content }}</div>
+                                <div class="text-xs opacity-75 mt-1">{{ message.created_at|date:"M j, Y g:i A" }}</div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-gray-500 py-8">
+                            <span class="material-icons text-4xl mb-2">chat</span>
+                            <p>No messages yet. Start the conversation!</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Message Input -->
+                    <div class="border-t p-4">
+                        <form method="post" class="flex space-x-4">
+                            {% csrf_token %}
+                            <div class="flex-1">
+                                <textarea name="content" id="messageInput" rows="2"
+                                          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                          placeholder="Type your message..." required></textarea>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <button type="submit"
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 h-full">
+                                    <span class="material-icons text-sm">send</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Members Sidebar -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-sm border p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Members ({{ active_members|length }})</h3>
+                    <div class="space-y-3">
+                        {% for member in active_members %}
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                                <span class="text-xs font-medium text-gray-600">
+                                    {{ member.user.first_name|first|upper }}{{ member.user.last_name|first|upper }}
+                                </span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900">{{ member.user.get_full_name }}</p>
+                                {% if member.role == 'admin' %}
+                                <p class="text-xs text-purple-600">Admin</p>
+                                {% else %}
+                                <p class="text-xs text-gray-500">Member</p>
+                                {% endif %}
+                            </div>
+                            {% if member.last_seen_at %}
+                            <div class="flex-shrink-0">
+                                <div class="w-2 h-2 bg-green-500 rounded-full" title="Online"></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-scroll to bottom of messages
+document.addEventListener('DOMContentLoaded', function() {
+    const messagesContainer = document.getElementById('messagesContainer');
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+});
+
+// Handle Enter key to send message
+document.getElementById('messageInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.form.submit();
+    }
+});
+
+// Auto-refresh messages every 30 seconds (optional)
+setInterval(function() {
+    // This could be enhanced with AJAX to fetch new messages
+    console.log('Checking for new messages...');
+}, 30000);
+</script>
+{% endblock %}
